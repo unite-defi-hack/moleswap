@@ -1,0 +1,3 @@
+const op::create_ton_order = "create_ton_order"c;
+const op::create = "create"c;
+

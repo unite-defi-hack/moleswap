@@ -1,0 +1,39 @@
+#include "stdlib.fc";
+
+;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000
+const int msg_flag::non_bounceable = 0x10;
+const int msg_flag::bounceable = 0x18;
+
+;; send_raw_message modes
+const REVERT_ON_ERRORS = 0;
+const PAY_FEES_SEPARATELY = 1;
+const IGNORE_ERRORS = 2;
+const SELFDESTRUCT_ON_EMPTY = 32;
+const CARRY_REMAINING_GAS = 64;
+const CARRY_REMAINING_BALANCE = 128;
+
+
+(slice, (int)) ~load_op(slice s) inline { return s.load_uint(32); }
+(slice, (int)) ~load_query_id(slice s) inline { return s.load_uint(64); }
+builder store_op(builder b, int op) inline { return b.store_uint(op, 32); }
+builder store_query_id(builder b, int query_id) inline { return b.store_uint(query_id, 64); }
+builder store_msg_flag(builder b, int msg_flag) inline { return b.store_uint(msg_flag, 6); }
+
+
+builder store_msgbody_prefix_stateinit(builder b, cell state_init, cell ref) inline {
+    return b.store_uint(4 + 2 + 1, 1 + 4 + 4 + 64 + 32 + 1 + 1 + 1).store_ref(state_init).store_ref(ref);
+}
+
+builder store_msgbody_prefix_slice(builder b) inline {
+    return b.store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
+}
+
+() send_message_with_stateinit(slice to, cell msg_body, cell state_init, int amount, int mode) impure inline_ref {
+    cell msg = begin_cell()
+        .store_msg_flag(msg_flag::bounceable)
+        .store_slice(to)
+        .store_coins(amount)
+        .store_msgbody_prefix_stateinit(state_init, msg_body)
+        .end_cell();
+    send_raw_message(msg, mode);
+}
