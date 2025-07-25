@@ -1,0 +1,3 @@
+const int error::not_enough_ton = 400;
+
+const int error::forbidden = 403;
