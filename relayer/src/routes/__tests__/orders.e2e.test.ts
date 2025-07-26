@@ -2,22 +2,19 @@
 process.env['NODE_ENV'] = 'test';
 
 import request from 'supertest';
-import express from 'express';
-import { orderRoutes } from '../orders';
-import { initializeDatabase, closeDatabase } from '../../database/connection';
+import { app } from '../../index';
+import { db, runMigrations } from '../../database/connection';
 import { ethers } from 'ethers';
-
-const app = express();
-app.use(express.json());
-app.use('/api/orders', orderRoutes);
 
 describe('Orders API - End to End Tests', () => {
   beforeAll(async () => {
-    await initializeDatabase();
+    // Ensure database is set up for tests
+    await runMigrations();
   });
 
   afterAll(async () => {
-    await closeDatabase();
+    // Clean up test data
+    await db('orders').del();
   });
 
   describe('POST /api/orders/data - E2E', () => {

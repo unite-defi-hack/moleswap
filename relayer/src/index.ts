@@ -15,6 +15,9 @@ dotenv.config();
 const app = express();
 const port = process.env['PORT'] || 3000;
 
+// Export app for testing
+export { app };
+
 // Security middleware
 app.use(helmet());
 app.use(cors());
@@ -74,6 +77,17 @@ async function startServer() {
   }
 }
 
+// Only start server if not in test environment
+if (process.env['NODE_ENV'] !== 'test') {
+  startServer();
+} else {
+  // In test environment, just initialize the database without starting server
+  initializeDatabase().catch((error) => {
+    logger.error('Failed to initialize database for tests:', error);
+    process.exit(1);
+  });
+}
+
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down gracefully');
@@ -83,6 +97,4 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down gracefully');
   process.exit(0);
-});
-
-startServer(); 
+}); 

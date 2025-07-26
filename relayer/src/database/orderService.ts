@@ -1,5 +1,6 @@
 import { db } from './connection';
 import { Order, OrderStatus, OrderWithMetadata, OrderQueryFilters, OrderQueryResponse } from '../types/orders';
+import { logger } from '../utils/logger';
 
 export interface InsertOrderParams {
   order: Order;
@@ -9,6 +10,12 @@ export interface InsertOrderParams {
   hashlock: string;
   orderData: any;
   signedData: any;
+}
+
+export interface SecretRequestParams {
+  orderHash: string;
+  requester: string;
+  validationProof?: any;
 }
 
 export async function insertOrder(params: InsertOrderParams): Promise<OrderWithMetadata> {
@@ -166,4 +173,93 @@ export async function updateOrderStatus(orderHash: string, newStatus: OrderStatu
     createdAt: new Date(updatedOrder.created_at),
     updatedAt: new Date(updatedOrder.updated_at)
   };
+}
+
+/**
+ * Store secret for an order
+ * @param orderHash - The order hash
+ * @param secret - The encrypted secret to store
+ * @returns Success status
+ */
+export async function storeOrderSecret(orderHash: string, secret: string): Promise<boolean> {
+  try {
+    const result = await db('orders')
+      .where({ order_hash: orderHash })
+      .update({
+        secret,
+        updated_at: new Date()
+      });
+    
+    return result > 0;
+  } catch (error) {
+    logger.error('Error storing order secret:', error);
+    return false;
+  }
+}
+
+/**
+ * Retrieve secret for an order
+ * @param orderHash - The order hash
+ * @returns The encrypted secret or null if not found
+ */
+export async function getOrderSecret(orderHash: string): Promise<string | null> {
+  try {
+    const order = await db('orders')
+      .select('secret')
+      .where({ order_hash: orderHash })
+      .first();
+    
+    return order?.secret || null;
+  } catch (error) {
+    logger.error('Error retrieving order secret:', error);
+    return null;
+  }
+}
+
+/**
+ * Validate that an order exists and is in a valid state for secret sharing
+ * @param orderHash - The order hash
+ * @returns Validation result
+ */
+export async function validateOrderForSecretSharing(orderHash: string): Promise<{
+  valid: boolean;
+  order?: any;
+  error?: string;
+}> {
+  try {
+    const order = await getOrderByHash(orderHash);
+    
+    if (!order) {
+      return {
+        valid: false,
+        error: 'Order not found'
+      };
+    }
+    
+    // Check if order is in a valid state for secret sharing
+    if (order.status !== 'active' && order.status !== 'completed') {
+      return {
+        valid: false,
+        error: `Order is in invalid state for secret sharing: ${order.status}`
+      };
+    }
+    
+    // Check if secret already exists
+    if (order.secret) {
+      return {
+        valid: false,
+        error: 'Secret has already been shared for this order'
+      };
+    }
+    
+    return {
+      valid: true,
+      order
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
 } 

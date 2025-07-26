@@ -35,11 +35,11 @@
   - [x] GET /api/orders - Query orders with filters
   - [x] Add order status management
 
-- [ ] **Secret Management**
-  - [ ] Implement secure secret generation with crypto module
-  - [ ] Add secret encryption/decryption with AES-256
-  - [ ] Create secret storage in database with Knex.js
-  - [ ] Add secret validation logic
+- [x] **Secret Management**
+  - [x] Implement secure secret generation with crypto module
+  - [x] Add secret encryption/decryption with AES-256
+  - [x] Create secret storage in database with Knex.js
+  - [x] Add secret validation logic
 
 ## Phase 3: Chain Integration
 - [ ] **Plugin Architecture**
@@ -99,7 +99,7 @@
 3. ~~**POST /api/orders/data** (Generate order data with hashlock)~~ ✅
 4. ~~**POST /api/orders** (Create order with signed data)~~ ✅
 5. ~~**Implement order management** (query orders, status management)~~ ✅
-6. **Add secret generation and storage**
+6. ~~**Add secret generation and storage**~~ ✅
 7. **Create basic API endpoints**
 8. **Implement Ethereum chain plugin**
 9. **Add escrow validation logic**

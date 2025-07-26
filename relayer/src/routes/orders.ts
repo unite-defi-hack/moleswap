@@ -143,7 +143,7 @@ router.post('/', async (req: Request, res: Response) => {
       };
       return res.status(409).json(response);
     }
-    // Insert order
+    // Insert order (secret will be generated when requested)
     const orderWithMeta = await insertOrder({
       order: signedOrder.order,
       orderHash,

@@ -59,13 +59,23 @@ export async function initializeDatabase(): Promise<void> {
     await db.raw('SELECT 1');
     logger.info('Database connection established successfully');
     
-    // Run migrations if in test environment
-    if (process.env['NODE_ENV'] === 'test') {
+    // Run migrations if not in test environment (tests handle their own setup)
+    if (process.env['NODE_ENV'] !== 'test') {
       await db.migrate.latest();
       logger.info('Database migrations completed');
     }
   } catch (error) {
     logger.error('Failed to connect to database:', error);
+    throw error;
+  }
+}
+
+export async function runMigrations(): Promise<void> {
+  try {
+    await db.migrate.latest();
+    logger.info('Database migrations completed');
+  } catch (error) {
+    logger.error('Failed to run migrations:', error);
     throw error;
   }
 }

@@ -200,6 +200,32 @@ export interface SecretGenerationResult {
 }
 
 /**
+ * Secret request parameters
+ */
+export interface SecretRequestParams {
+  requester: string;
+  validationProof?: any;
+}
+
+/**
+ * Secret request response
+ */
+export interface SecretRequestResponse {
+  secret: string;
+  orderHash: string;
+  sharedAt: Date;
+}
+
+/**
+ * Secret validation result
+ */
+export interface SecretValidationResult {
+  valid: boolean;
+  error?: string;
+  details?: any;
+}
+
+/**
  * Order status transition
  */
 export interface OrderStatusTransition {
@@ -256,7 +282,10 @@ export enum OrderErrorCode {
   INVALID_HASHLOCK = 'INVALID_HASHLOCK',
   ORDER_EXPIRED = 'ORDER_EXPIRED',
   INSUFFICIENT_BALANCE = 'INSUFFICIENT_BALANCE',
-  CHAIN_NOT_SUPPORTED = 'CHAIN_NOT_SUPPORTED'
+  CHAIN_NOT_SUPPORTED = 'CHAIN_NOT_SUPPORTED',
+  SECRET_ALREADY_SHARED = 'SECRET_ALREADY_SHARED',
+  INVALID_SECRET_REQUEST = 'INVALID_SECRET_REQUEST',
+  ESCROW_VALIDATION_FAILED = 'ESCROW_VALIDATION_FAILED'
 }
 
 /**
