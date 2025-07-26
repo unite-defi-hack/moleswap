@@ -1,0 +1,4 @@
+[submodule "1inch-cross-chain-sdk"]
+	path = 1inch-cross-chain-sdk
+	url = git@github.com:unite-defi-hack/cross-chain-sdk.git
+	branch = feat/ton
