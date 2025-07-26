@@ -1,0 +1,24 @@
+#include "../imports/stdlib.fc";
+#include "../imports/utils.fc";
+#include "./storage.fc";
+
+
+slice get_src_escrow_address(int order_hash) method_id {
+    load_data();
+    cell data = begin_cell()
+        .store_slice(my_address())
+        .store_uint(order_hash, 256)
+        .end_cell();
+    cell state_init = calculate_state_init(data, storage::src_escrow_code);
+    return calculate_contract_address(state_init);
+}
+
+slice get_dst_escrow_address(int order_hash) method_id {
+    load_data();
+    cell data = begin_cell()
+        .store_slice(my_address())
+        .store_uint(order_hash, 256)
+        .end_cell();
+    cell state_init = calculate_state_init(data, storage::dst_escrow_code);
+    return calculate_contract_address(state_init);
+}
