@@ -5,16 +5,19 @@ import {
   validateOrderData, 
   validateSignedOrder, 
   validateOrderQuery,
+  validateOrderStatusUpdate,
+  validateOrderHash,
   OrderErrorCode,
   ApiResponse,
   OrderDataResponse,
   OrderCreationResponse,
   OrderQueryResponse,
+  OrderWithMetadata,
   OrderStatus
 } from '../types';
 import { generateOrderHash, verifyOrderSignature, generateRandomSalt } from '../utils/orderHashing';
 import { generateSecretWithHashlock, getEncryptionKey } from '../utils/secretGeneration';
-import { insertOrder, getOrderByHash } from '../database/orderService';
+import { insertOrder, getOrderByHash, queryOrders, updateOrderStatus } from '../database/orderService';
 
 const router = Router();
 
@@ -195,25 +198,132 @@ router.get('/', async (req: Request, res: Response) => {
     
     const filters = validation.value!;
     
-    // TODO: Query orders from database using filters
-    // For now, return empty result
+    // Query orders from database using filters
+    const result = await queryOrders(filters);
+    
     const response: ApiResponse<OrderQueryResponse> = {
       success: true,
-      data: {
-        orders: [],
-        total: 0,
-        limit: filters.limit || 50,
-        offset: filters.offset || 0,
-        hasMore: false
-      }
+      data: result
     };
     
-    logger.info('Orders queried successfully', { filters });
+    logger.info('Orders queried successfully', { 
+      filters,
+      total: result.total,
+      returned: result.orders.length,
+      hasMore: result.hasMore
+    });
     return res.json(response);
     
   } catch (error) {
     logger.error('Error querying orders:', error);
     throw createError('Failed to query orders', 500);
+  }
+});
+
+// PATCH /api/orders/:orderHash/status - Update order status
+router.patch('/:orderHash/status', async (req: Request, res: Response) => {
+  try {
+    const orderHash = req.params['orderHash'];
+    if (!orderHash) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.INVALID_ORDER,
+          message: 'Order hash is required',
+          details: {}
+        }
+      };
+      return res.status(400).json(response);
+    }
+    
+    logger.info('Updating order status', { 
+      orderHash, 
+      body: req.body 
+    });
+    
+    // Validate order hash parameter
+    const hashValidation = validateOrderHash(orderHash);
+    if (!hashValidation.valid) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.INVALID_ORDER,
+          message: 'Invalid order hash',
+          details: {
+            errors: hashValidation.errors
+          }
+        }
+      };
+      return res.status(400).json(response);
+    }
+    
+    // Validate request body
+    const validation = validateOrderStatusUpdate(req.body);
+    if (!validation.valid) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.INVALID_ORDER,
+          message: 'Invalid status update data',
+          details: {
+            errors: validation.errors
+          }
+        }
+      };
+      return res.status(400).json(response);
+    }
+    
+    const { status, reason } = validation.value!;
+    
+    // Update order status
+    const updatedOrder = await updateOrderStatus(orderHash, status, reason);
+    
+    if (!updatedOrder) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.ORDER_NOT_FOUND,
+          message: 'Order not found',
+          details: {
+            orderHash
+          }
+        }
+      };
+      return res.status(404).json(response);
+    }
+    
+    const response: ApiResponse<OrderWithMetadata> = {
+      success: true,
+      data: updatedOrder
+    };
+    
+    logger.info('Order status updated successfully', { 
+      orderHash,
+      oldStatus: 'unknown', // We could track this if needed
+      newStatus: status,
+      reason
+    });
+    return res.json(response);
+    
+  } catch (error) {
+    logger.error('Error updating order status:', error);
+    
+    // Handle specific error for invalid status transition
+    if (error instanceof Error && error.message.includes('Invalid status transition')) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.INVALID_ORDER,
+          message: error.message,
+          details: {
+            orderHash: req.params['orderHash']
+          }
+        }
+      };
+      return res.status(400).json(response);
+    }
+    
+    throw createError('Failed to update order status', 500);
   }
 });
 

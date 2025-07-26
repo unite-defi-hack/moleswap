@@ -1,6 +1,48 @@
 import knex from 'knex';
-import config from '../../knexfile';
 import { logger } from '../utils/logger';
+
+// Database configuration
+const config: Record<string, any> = {
+  test: {
+    client: 'sqlite3',
+    connection: {
+      filename: ':memory:',
+    },
+    useNullAsDefault: true,
+    migrations: {
+      directory: './src/database/migrations',
+    },
+    seeds: {
+      directory: './src/database/seeds',
+    },
+  },
+  development: {
+    client: 'sqlite3',
+    connection: {
+      filename: './data/relayer.db',
+    },
+    useNullAsDefault: true,
+    migrations: {
+      directory: './src/database/migrations',
+    },
+    seeds: {
+      directory: './src/database/seeds',
+    },
+  },
+  production: {
+    client: 'sqlite3',
+    connection: {
+      filename: process.env['DATABASE_PATH'] || './data/relayer.db',
+    },
+    useNullAsDefault: true,
+    migrations: {
+      directory: './src/database/migrations',
+    },
+    seeds: {
+      directory: './src/database/seeds',
+    },
+  },
+};
 
 const environment = process.env['NODE_ENV'] || 'development';
 const dbConfig = config[environment];
@@ -16,6 +58,12 @@ export async function initializeDatabase(): Promise<void> {
     // Test the connection
     await db.raw('SELECT 1');
     logger.info('Database connection established successfully');
+    
+    // Run migrations if in test environment
+    if (process.env['NODE_ENV'] === 'test') {
+      await db.migrate.latest();
+      logger.info('Database migrations completed');
+    }
   } catch (error) {
     logger.error('Failed to connect to database:', error);
     throw error;

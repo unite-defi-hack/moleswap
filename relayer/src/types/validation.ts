@@ -243,6 +243,23 @@ export const orderHashParamSchema = Joi.object({
     })
 });
 
+// Order status update schema
+export const orderStatusUpdateSchema = Joi.object({
+  status: Joi.string()
+    .valid(...Object.values(OrderStatus))
+    .required()
+    .messages({
+      'any.only': 'Status must be one of: pending, active, completed, cancelled',
+      'any.required': 'Status is required'
+    }),
+  reason: Joi.string()
+    .max(500)
+    .optional()
+    .messages({
+      'string.max': 'Reason cannot exceed 500 characters'
+    })
+});
+
 /**
  * Custom validation functions
  */
@@ -469,5 +486,26 @@ export const validateOrderHash = (orderHash: string) => {
   return {
     valid: true,
     errors: []
+  };
+};
+
+export const validateOrderStatusUpdate = (data: any) => {
+  const { error, value } = orderStatusUpdateSchema.validate(data, {
+    abortEarly: false,
+    stripUnknown: true
+  });
+  
+  if (error) {
+    return {
+      valid: false,
+      errors: error.details.map(detail => detail.message),
+      value: undefined
+    };
+  }
+  
+  return {
+    valid: true,
+    errors: [],
+    value
   };
 }; 

@@ -1,5 +1,5 @@
 import { db } from './connection';
-import { Order, OrderStatus, OrderWithMetadata } from '../types/orders';
+import { Order, OrderStatus, OrderWithMetadata, OrderQueryFilters, OrderQueryResponse } from '../types/orders';
 
 export interface InsertOrderParams {
   order: Order;
@@ -44,4 +44,126 @@ export async function insertOrder(params: InsertOrderParams): Promise<OrderWithM
 
 export async function getOrderByHash(orderHash: string) {
   return db('orders').where({ order_hash: orderHash }).first();
+}
+
+export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQueryResponse> {
+  const limit = filters.limit || 50;
+  const offset = filters.offset || 0;
+  
+  // Build query with filters
+  let query = db('orders').select('*');
+  
+  // Apply filters
+  if (filters.status) {
+    query = query.where({ status: filters.status });
+  }
+  
+  if (filters.maker) {
+    query = query.where({ maker: filters.maker });
+  }
+  
+  if (filters.makerAsset) {
+    query = query.where({ maker_token: filters.makerAsset });
+  }
+  
+  if (filters.takerAsset) {
+    query = query.where({ taker_token: filters.takerAsset });
+  }
+  
+  // Get total count for pagination
+  const countQuery = query.clone();
+  const totalResult = await countQuery.count('* as total').first();
+  const total = totalResult ? Number(totalResult['total']) : 0;
+  
+  // Apply pagination and ordering
+  const orders = await query
+    .orderBy('created_at', 'desc')
+    .limit(limit)
+    .offset(offset);
+  
+  // Transform database records to OrderWithMetadata format
+  const transformedOrders: OrderWithMetadata[] = orders.map(order => {
+    const orderData = JSON.parse(order.order_data);
+    return {
+      order: {
+        maker: order.maker,
+        makerAsset: order.maker_token,
+        takerAsset: order.taker_token,
+        makerTraits: order.hashlock,
+        salt: orderData.salt || '',
+        makingAmount: order.maker_amount,
+        takingAmount: order.taker_amount,
+        receiver: orderData.receiver || '0x0000000000000000000000000000000000000000'
+      },
+      orderHash: order.order_hash,
+      status: order.status as OrderStatus,
+      createdAt: new Date(order.created_at),
+      updatedAt: new Date(order.updated_at)
+    };
+  });
+  
+  return {
+    orders: transformedOrders,
+    total,
+    limit,
+    offset,
+    hasMore: offset + limit < total
+  };
+}
+
+export async function updateOrderStatus(orderHash: string, newStatus: OrderStatus, _reason?: string): Promise<OrderWithMetadata | null> {
+  // Get current order
+  const currentOrder = await getOrderByHash(orderHash);
+  if (!currentOrder) {
+    return null;
+  }
+  
+  // Validate status transition
+  const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+    [OrderStatus.PENDING]: [OrderStatus.ACTIVE, OrderStatus.CANCELLED],
+    [OrderStatus.ACTIVE]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+    [OrderStatus.COMPLETED]: [], // No further transitions
+    [OrderStatus.CANCELLED]: [] // No further transitions
+  };
+  
+  const currentStatus = currentOrder.status as OrderStatus;
+  const allowedTransitions = validTransitions[currentStatus];
+  
+  if (!allowedTransitions.includes(newStatus)) {
+    throw new Error(`Invalid status transition from ${currentStatus} to ${newStatus}`);
+  }
+  
+  // Update order status
+  const now = new Date();
+  await db('orders')
+    .where({ order_hash: orderHash })
+    .update({
+      status: newStatus,
+      updated_at: now
+    });
+  
+  // Get updated order
+  const updatedOrder = await getOrderByHash(orderHash);
+  if (!updatedOrder) {
+    throw new Error('Failed to retrieve updated order');
+  }
+  
+  // Transform to OrderWithMetadata format
+  const orderData = JSON.parse(updatedOrder.order_data);
+  return {
+    order: {
+      maker: updatedOrder.maker,
+      makerAsset: updatedOrder.maker_token,
+      takerAsset: updatedOrder.taker_token,
+      makerTraits: updatedOrder.hashlock,
+      salt: orderData.salt || '',
+      makingAmount: updatedOrder.maker_amount,
+      takingAmount: updatedOrder.taker_amount,
+      receiver: orderData.receiver || '0x0000000000000000000000000000000000000000'
+    },
+    orderHash: updatedOrder.order_hash,
+    status: updatedOrder.status as OrderStatus,
+    createdAt: new Date(updatedOrder.created_at),
+    updatedAt: new Date(updatedOrder.updated_at)
+  };
 } 

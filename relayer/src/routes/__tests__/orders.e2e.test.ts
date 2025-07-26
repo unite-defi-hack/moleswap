@@ -1,3 +1,6 @@
+// Set test environment before any imports
+process.env['NODE_ENV'] = 'test';
+
 import request from 'supertest';
 import express from 'express';
 import { orderRoutes } from '../orders';
@@ -224,6 +227,332 @@ describe('Orders API - End to End Tests', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error).toBeDefined();
       expect(response.body.error.code).toBe('INVALID_ORDER');
+    });
+  });
+
+  describe('GET /api/orders - E2E', () => {
+    let testOrders: string[] = [];
+
+    beforeAll(async () => {
+      // Create multiple test orders for querying
+      const orderData = (global as any).generatedOrderData;
+      const domain = {
+        name: 'MoleSwap Relayer',
+        version: '1.0.0',
+        chainId: 1,
+        verifyingContract: '0x0000000000000000000000000000000000000000'
+      };
+      const types = {
+        Order: [
+          { name: 'maker', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
+          { name: 'makerTraits', type: 'bytes32' },
+          { name: 'salt', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
+          { name: 'receiver', type: 'address' }
+        ]
+      };
+
+      // Create 3 test orders with different makers
+      for (let i = 0; i < 3; i++) {
+        const wallet = ethers.Wallet.createRandom();
+        const orderToSign = {
+          ...orderData.orderToSign,
+          maker: wallet.address
+        };
+        const signature = await wallet.signTypedData(domain, types, orderToSign);
+        const signedOrder = { order: orderToSign, signature };
+
+        const response = await request(app)
+          .post('/api/orders')
+          .send({ signedOrder });
+
+        if (response.status === 201) {
+          testOrders.push(response.body.data.orderHash);
+        }
+      }
+    });
+
+    it('should query all orders without filters', async () => {
+      const response = await request(app)
+        .get('/api/orders')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.orders).toBeDefined();
+      expect(response.body.data.total).toBeGreaterThanOrEqual(3);
+      expect(response.body.data.limit).toBe(50);
+      expect(response.body.data.offset).toBe(0);
+      expect(response.body.data.hasMore).toBeDefined();
+
+      // Validate order structure
+      if (response.body.data.orders.length > 0) {
+        const order = response.body.data.orders[0];
+        expect(order.order).toBeDefined();
+        expect(order.orderHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
+        expect(order.status).toBeDefined();
+        expect(order.createdAt).toBeDefined();
+        expect(order.updatedAt).toBeDefined();
+      }
+    });
+
+    it('should query orders with status filter', async () => {
+      const response = await request(app)
+        .get('/api/orders?status=active')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toBeDefined();
+      
+      // All returned orders should have active status
+      response.body.data.orders.forEach((order: any) => {
+        expect(order.status).toBe('active');
+      });
+    });
+
+    it('should query orders with maker filter', async () => {
+      // Get the first test order to use its maker
+      const { getOrderByHash } = require('../../database/orderService');
+      const firstOrder = await getOrderByHash(testOrders[0]);
+      const maker = firstOrder.maker;
+
+      const response = await request(app)
+        .get(`/api/orders?maker=${maker}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toBeDefined();
+      
+      // All returned orders should have the specified maker
+      response.body.data.orders.forEach((order: any) => {
+        expect(order.order.maker).toBe(maker);
+      });
+    });
+
+    it('should query orders with makerAsset filter', async () => {
+      const makerAsset = '0x10563e509b718a279de002dfc3e94a8a8f642b03';
+
+      const response = await request(app)
+        .get(`/api/orders?makerAsset=${makerAsset}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toBeDefined();
+      
+      // All returned orders should have the specified makerAsset
+      response.body.data.orders.forEach((order: any) => {
+        expect(order.order.makerAsset).toBe(makerAsset);
+      });
+    });
+
+    it('should query orders with takerAsset filter', async () => {
+      const takerAsset = '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c';
+
+      const response = await request(app)
+        .get(`/api/orders?takerAsset=${takerAsset}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toBeDefined();
+      
+      // All returned orders should have the specified takerAsset
+      response.body.data.orders.forEach((order: any) => {
+        expect(order.order.takerAsset).toBe(takerAsset);
+      });
+    });
+
+    it('should query orders with pagination', async () => {
+      const response = await request(app)
+        .get('/api/orders?limit=2&offset=0')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toBeDefined();
+      expect(response.body.data.limit).toBe(2);
+      expect(response.body.data.offset).toBe(0);
+      expect(response.body.data.orders.length).toBeLessThanOrEqual(2);
+      expect(response.body.data.hasMore).toBeDefined();
+    });
+
+    it('should query orders with multiple filters', async () => {
+      const makerAsset = '0x10563e509b718a279de002dfc3e94a8a8f642b03';
+      const takerAsset = '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c';
+
+      const response = await request(app)
+        .get(`/api/orders?status=active&makerAsset=${makerAsset}&takerAsset=${takerAsset}`)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toBeDefined();
+      
+      // All returned orders should match all filters
+      response.body.data.orders.forEach((order: any) => {
+        expect(order.status).toBe('active');
+        expect(order.order.makerAsset).toBe(makerAsset);
+        expect(order.order.takerAsset).toBe(takerAsset);
+      });
+    });
+
+    it('should handle invalid filter parameters', async () => {
+      const response = await request(app)
+        .get('/api/orders?status=invalid_status')
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBeDefined();
+      expect(response.body.error.code).toBe('INVALID_ORDER');
+    });
+  });
+
+  describe('PATCH /api/orders/:orderHash/status - E2E', () => {
+    let testOrderHash: string;
+
+    beforeAll(async () => {
+      // Create a test order for status updates
+      const orderData = (global as any).generatedOrderData;
+      const wallet = ethers.Wallet.createRandom();
+      const orderToSign = {
+        ...orderData.orderToSign,
+        maker: wallet.address
+      };
+      
+      const domain = {
+        name: 'MoleSwap Relayer',
+        version: '1.0.0',
+        chainId: 1,
+        verifyingContract: '0x0000000000000000000000000000000000000000'
+      };
+      const types = {
+        Order: [
+          { name: 'maker', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
+          { name: 'makerTraits', type: 'bytes32' },
+          { name: 'salt', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
+          { name: 'receiver', type: 'address' }
+        ]
+      };
+
+      const signature = await wallet.signTypedData(domain, types, orderToSign);
+      const signedOrder = { order: orderToSign, signature };
+
+      const response = await request(app)
+        .post('/api/orders')
+        .send({ signedOrder });
+
+      testOrderHash = response.body.data.orderHash;
+    });
+
+    it('should update order status from active to completed', async () => {
+      const response = await request(app)
+        .patch(`/api/orders/${testOrderHash}/status`)
+        .send({ status: 'completed', reason: 'Order fulfilled' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toBeDefined();
+      expect(response.body.data.orderHash).toBe(testOrderHash);
+      expect(response.body.data.status).toBe('completed');
+      expect(response.body.data.order).toBeDefined();
+      expect(response.body.data.createdAt).toBeDefined();
+      expect(response.body.data.updatedAt).toBeDefined();
+    });
+
+    it('should reject invalid status transition', async () => {
+      // Try to change from completed back to active (invalid transition)
+      const response = await request(app)
+        .patch(`/api/orders/${testOrderHash}/status`)
+        .send({ status: 'active', reason: 'Invalid transition' })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBeDefined();
+      expect(response.body.error.message).toContain('Invalid status transition');
+    });
+
+    it('should reject invalid order hash', async () => {
+      const response = await request(app)
+        .patch('/api/orders/invalid_hash/status')
+        .send({ status: 'active' })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBeDefined();
+      expect(response.body.error.code).toBe('INVALID_ORDER');
+    });
+
+    it('should reject non-existent order', async () => {
+      const fakeHash = '0x' + '1'.repeat(64);
+      const response = await request(app)
+        .patch(`/api/orders/${fakeHash}/status`)
+        .send({ status: 'cancelled' })
+        .expect(404);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBeDefined();
+      expect(response.body.error.code).toBe('ORDER_NOT_FOUND');
+    });
+
+    it('should reject invalid status update data', async () => {
+      const response = await request(app)
+        .patch(`/api/orders/${testOrderHash}/status`)
+        .send({ status: 'invalid_status' })
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error).toBeDefined();
+      expect(response.body.error.code).toBe('INVALID_ORDER');
+    });
+
+    it('should update status without reason', async () => {
+      // Create a new order for this test
+      const orderData = (global as any).generatedOrderData;
+      const wallet = ethers.Wallet.createRandom();
+      const orderToSign = {
+        ...orderData.orderToSign,
+        maker: wallet.address
+      };
+      
+      const domain = {
+        name: 'MoleSwap Relayer',
+        version: '1.0.0',
+        chainId: 1,
+        verifyingContract: '0x0000000000000000000000000000000000000000'
+      };
+      const types = {
+        Order: [
+          { name: 'maker', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
+          { name: 'makerTraits', type: 'bytes32' },
+          { name: 'salt', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
+          { name: 'receiver', type: 'address' }
+        ]
+      };
+
+      const signature = await wallet.signTypedData(domain, types, orderToSign);
+      const signedOrder = { order: orderToSign, signature };
+
+      const createResponse = await request(app)
+        .post('/api/orders')
+        .send({ signedOrder });
+
+      const newOrderHash = createResponse.body.data.orderHash;
+
+      const response = await request(app)
+        .patch(`/api/orders/${newOrderHash}/status`)
+        .send({ status: 'cancelled' })
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('cancelled');
     });
   });
 

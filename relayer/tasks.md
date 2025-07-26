@@ -32,8 +32,8 @@
 - [ ] **Order Endpoints**
   - [x] POST /api/orders/data - Generate order data with hashlock
   - [x] POST /api/orders - Create order with signed data
-  - [ ] GET /api/orders - Query orders with filters
-  - [ ] Add order status management
+  - [x] GET /api/orders - Query orders with filters
+  - [x] Add order status management
 
 - [ ] **Secret Management**
   - [ ] Implement secure secret generation with crypto module
@@ -98,7 +98,7 @@
 2. ~~**Implement order types and interfaces** (Order, validation, EIP-712)~~ ✅
 3. ~~**POST /api/orders/data** (Generate order data with hashlock)~~ ✅
 4. ~~**POST /api/orders** (Create order with signed data)~~ ✅
-5. **Implement order management** (query orders, status management)
+5. ~~**Implement order management** (query orders, status management)~~ ✅
 6. **Add secret generation and storage**
 7. **Create basic API endpoints**
 8. **Implement Ethereum chain plugin**

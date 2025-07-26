@@ -13,7 +13,7 @@ import { secretRoutes } from './routes/secrets';
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env['PORT'] || 3000;
 
 // Security middleware
 app.use(helmet());
@@ -21,8 +21,8 @@ app.use(cors());
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'), // limit each IP to 100 requests per windowMs
+  windowMs: parseInt(process.env['RATE_LIMIT_WINDOW_MS'] || '900000'), // 15 minutes
+  max: parseInt(process.env['RATE_LIMIT_MAX_REQUESTS'] || '100'), // limit each IP to 100 requests per windowMs
   message: 'Too many requests from this IP, please try again later.',
 });
 app.use(limiter);
@@ -32,7 +32,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Request logging
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   logger.info(`${req.method} ${req.path}`, {
     ip: req.ip,
     userAgent: req.get('User-Agent'),
@@ -41,7 +41,7 @@ app.use((req, res, next) => {
 });
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
@@ -53,7 +53,7 @@ app.use('/api/secrets', secretRoutes);
 app.use(errorHandler);
 
 // 404 handler
-app.use('*', (req, res) => {
+app.use('*', (_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
@@ -66,7 +66,7 @@ async function startServer() {
     // Start server
     app.listen(port, () => {
       logger.info(`Server running on port ${port}`);
-      logger.info(`Environment: ${process.env.NODE_ENV}`);
+      logger.info(`Environment: ${process.env['NODE_ENV']}`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
