@@ -1,8 +1,8 @@
 import winston from 'winston';
 import path from 'path';
 
-const logLevel = process.env.LOG_LEVEL || 'info';
-const logFile = process.env.LOG_FILE || './logs/relayer.log';
+const logLevel = process.env['LOG_LEVEL'] || 'info';
+const logFile = process.env['LOG_FILE'] || './logs/relayer.log';
 
 // Create logs directory if it doesn't exist
 const fs = require('fs');
@@ -31,7 +31,7 @@ const logger = winston.createLogger({
 });
 
 // If we're not in production, log to the console as well
-if (process.env.NODE_ENV !== 'production') {
+if (process.env['NODE_ENV'] !== 'production') {
   logger.add(
     new winston.transports.Console({
       format: winston.format.combine(

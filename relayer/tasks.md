@@ -23,14 +23,14 @@
   - [x] Set up CORS and security headers with Helmet
 
 ## Phase 2: Order Management
-- [ ] **Order Types and Interfaces**
-  - [ ] Define Order interface based on 1inch format
-  - [ ] Create OrderWithMetadata interface
-  - [ ] Add validation schemas for orders
-  - [ ] Implement EIP-712 order hashing
+- [x] **Order Types and Interfaces**
+  - [x] Define Order interface based on 1inch format
+  - [x] Create OrderWithMetadata interface
+  - [x] Add validation schemas for orders
+  - [x] Implement EIP-712 order hashing
 
 - [ ] **Order Endpoints**
-  - [ ] POST /api/orders/data - Generate order data with hashlock
+  - [x] POST /api/orders/data - Generate order data with hashlock
   - [ ] POST /api/orders - Create order with signed data
   - [ ] GET /api/orders - Query orders with filters
   - [ ] Add order status management
@@ -94,12 +94,14 @@
   - [ ] Security audit and hardening
 
 ## Current Priority Tasks
-1. **Set up basic project structure** (TypeScript, Express, SQLite)
-2. **Implement order management** (create, store, query orders)
-3. **Add secret generation and storage**
-4. **Create basic API endpoints**
-5. **Implement Ethereum chain plugin**
-6. **Add escrow validation logic**
+1. ~~**Set up basic project structure** (TypeScript, Express, SQLite)~~ ✅
+2. ~~**Implement order types and interfaces** (Order, validation, EIP-712)~~ ✅
+3. ~~**POST /api/orders/data** (Generate order data with hashlock)~~ ✅
+4. **Implement order management** (create, store, query orders)
+5. **Add secret generation and storage**
+6. **Create basic API endpoints**
+7. **Implement Ethereum chain plugin**
+8. **Add escrow validation logic**
 
 ## Success Criteria
 - [ ] Orders can be created and stored in SQLite
