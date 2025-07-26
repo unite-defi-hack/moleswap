@@ -42,11 +42,11 @@
   - [x] Add secret validation logic
 
 ## Phase 3: Chain Integration
-- [ ] **Plugin Architecture**
-  - [ ] Define ChainPlugin interface
-  - [ ] Create plugin registry system
-  - [ ] Implement plugin loading mechanism
-  - [ ] Add plugin configuration management
+- [x] **Plugin Architecture**
+  - [x] Define ChainPlugin interface
+  - [x] Create plugin registry system
+  - [x] Implement plugin loading mechanism
+  - [x] Add plugin configuration management
 
 - [ ] **Ethereum Chain Plugin**
   - [ ] Implement EVM chain plugin with ethers.js
@@ -100,9 +100,11 @@
 4. ~~**POST /api/orders** (Create order with signed data)~~ ✅
 5. ~~**Implement order management** (query orders, status management)~~ ✅
 6. ~~**Add secret generation and storage**~~ ✅
-7. **Create basic API endpoints**
-8. **Implement Ethereum chain plugin**
-9. **Add escrow validation logic**
+7. ~~**Create basic API endpoints**~~ ✅
+8. ~~**Implement Ethereum chain plugin**~~ ✅
+9. ~~**Add escrow validation logic**~~ ✅
+10. **Implement TON chain plugin**
+11. **Add comprehensive testing**
 
 ## Success Criteria
 - [ ] Orders can be created and stored in SQLite

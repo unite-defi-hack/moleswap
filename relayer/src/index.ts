@@ -8,6 +8,12 @@ import { errorHandler } from './middleware/errorHandler';
 import { initializeDatabase } from './database/connection';
 import { orderRoutes } from './routes/orders';
 import { secretRoutes } from './routes/secrets';
+import { pluginRoutes } from './routes/plugins';
+import { 
+  PluginRegistryImpl, 
+  PluginFactoryImpl, 
+  loadPluginConfig 
+} from './plugins';
 
 // Load environment variables
 dotenv.config();
@@ -17,6 +23,10 @@ const port = process.env['PORT'] || 3000;
 
 // Export app for testing
 export { app };
+
+// Initialize plugin system
+const pluginFactory = new PluginFactoryImpl();
+const pluginRegistry = new PluginRegistryImpl(pluginFactory);
 
 // Security middleware
 app.use(helmet());
@@ -44,13 +54,38 @@ app.use((req, _res, next) => {
 });
 
 // Health check endpoint
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (_req, res) => {
+  try {
+    const pluginStatuses = pluginRegistry.getAllPluginStatuses();
+    const healthyPlugins = pluginStatuses.filter(s => s.status === 'healthy').length;
+    const totalPlugins = pluginStatuses.length;
+    
+    res.json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      plugins: {
+        total: totalPlugins,
+        healthy: healthyPlugins,
+        unhealthy: totalPlugins - healthyPlugins
+      }
+    });
+  } catch (error) {
+    logger.error('Health check failed:', error);
+    res.status(500).json({ 
+      status: 'error', 
+      timestamp: new Date().toISOString(),
+      error: 'Health check failed'
+    });
+  }
 });
+
+// Make plugin registry available to routes
+app.set('pluginRegistry', pluginRegistry);
 
 // API routes
 app.use('/api/orders', orderRoutes);
 app.use('/api/secrets', secretRoutes);
+app.use('/api/plugins', pluginRoutes);
 
 // Error handling middleware
 app.use(errorHandler);
@@ -66,10 +101,16 @@ async function startServer() {
     await initializeDatabase();
     logger.info('Database initialized successfully');
 
+    // Load and initialize plugins
+    const pluginConfigs = loadPluginConfig();
+    await pluginRegistry.loadPlugins(pluginConfigs);
+    logger.info('Plugins initialized successfully');
+
     // Start server
     app.listen(port, () => {
       logger.info(`Server running on port ${port}`);
       logger.info(`Environment: ${process.env['NODE_ENV']}`);
+      logger.info(`Loaded ${pluginRegistry.getAllPlugins().length} plugins`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
