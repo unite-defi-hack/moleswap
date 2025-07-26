@@ -31,7 +31,7 @@
 
 - [ ] **Order Endpoints**
   - [x] POST /api/orders/data - Generate order data with hashlock
-  - [ ] POST /api/orders - Create order with signed data
+  - [x] POST /api/orders - Create order with signed data
   - [ ] GET /api/orders - Query orders with filters
   - [ ] Add order status management
 
@@ -97,11 +97,12 @@
 1. ~~**Set up basic project structure** (TypeScript, Express, SQLite)~~ ✅
 2. ~~**Implement order types and interfaces** (Order, validation, EIP-712)~~ ✅
 3. ~~**POST /api/orders/data** (Generate order data with hashlock)~~ ✅
-4. **Implement order management** (create, store, query orders)
-5. **Add secret generation and storage**
-6. **Create basic API endpoints**
-7. **Implement Ethereum chain plugin**
-8. **Add escrow validation logic**
+4. ~~**POST /api/orders** (Create order with signed data)~~ ✅
+5. **Implement order management** (query orders, status management)
+6. **Add secret generation and storage**
+7. **Create basic API endpoints**
+8. **Implement Ethereum chain plugin**
+9. **Add escrow validation logic**
 
 ## Success Criteria
 - [ ] Orders can be created and stored in SQLite

@@ -121,6 +121,26 @@ interface ChainPlugin {
 
 ## Testing
 
+The project includes comprehensive test coverage with both unit tests and end-to-end (e2e) tests.
+
+### Test Structure
+
+```
+src/
+├── routes/
+│   └── __tests__/
+│       ├── orders.e2e.test.ts    # End-to-end order API tests
+│       └── orders.test.ts         # Unit tests for order routes
+├── utils/
+│   └── __tests__/
+│       └── orderHashing.test.ts  # Unit tests for order hashing
+└── database/
+    └── migrations/                # Database migration tests
+```
+
+### Running Tests
+
+#### All Tests
 ```bash
 # Run all tests
 npm test
@@ -130,6 +150,142 @@ npm run test:watch
 
 # Run tests with coverage
 npm test -- --coverage
+```
+
+#### Unit Tests
+```bash
+# Run all unit tests
+npm test -- --testPathPattern="\.test\.ts$"
+
+# Run specific unit test file
+npm test -- src/utils/__tests__/orderHashing.test.ts
+
+# Run unit tests in watch mode
+npm test -- --testPathPattern="\.test\.ts$" --watch
+```
+
+#### End-to-End Tests
+```bash
+# Run all e2e tests
+npm test -- --testPathPattern="\.e2e\.test\.ts$"
+
+# Run specific e2e test file
+npm test -- src/routes/__tests__/orders.e2e.test.ts
+
+# Run e2e tests with development database
+NODE_ENV=development npm test -- src/routes/__tests__/orders.e2e.test.ts
+```
+
+#### Test Environment
+
+**Important**: E2E tests require the development database environment to access the SQLite database with proper tables.
+
+```bash
+# For e2e tests, always use development environment
+NODE_ENV=development npm test -- src/routes/__tests__/orders.e2e.test.ts
+```
+
+### Test Coverage
+
+#### Unit Tests
+- **Order Hashing**: EIP-712 signature generation and verification
+- **Validation**: Input validation and sanitization
+- **Database Operations**: Order insertion and retrieval
+- **Utility Functions**: Secret generation and encryption
+
+#### End-to-End Tests
+- **Order Data Generation**: `POST /api/orders/data` endpoint
+- **Order Creation**: `POST /api/orders` endpoint with signature verification
+- **Duplicate Detection**: Order hash uniqueness validation
+- **Error Handling**: Invalid signatures and malformed data
+- **Database Integration**: Order persistence and retrieval
+
+### Test Commands Reference
+
+```bash
+# Quick test runs
+npm test                                    # All tests
+npm test -- --verbose                      # Verbose output
+npm test -- --testNamePattern="order"      # Tests matching pattern
+
+# Specific test types
+npm test -- --testPathPattern="\.test\.ts$"           # Unit tests only
+npm test -- --testPathPattern="\.e2e\.test\.ts$"      # E2E tests only
+
+# Development environment (required for e2e)
+NODE_ENV=development npm test -- src/routes/__tests__/orders.e2e.test.ts
+
+# Coverage reports
+npm test -- --coverage --coverageReporters=text
+npm test -- --coverage --coverageReporters=html
+```
+
+### Test Database
+
+E2E tests use the development SQLite database located at `data/relayer.db`. The database is automatically created and migrated when running tests in development mode.
+
+```bash
+# Ensure database is set up
+npm run migrate
+
+# Run e2e tests
+NODE_ENV=development npm test -- src/routes/__tests__/orders.e2e.test.ts
+```
+
+### Writing Tests
+
+#### Unit Test Example
+```typescript
+import { generateOrderHash } from '../utils/orderHashing';
+
+describe('Order Hashing', () => {
+  it('should generate valid order hash', () => {
+    const order = {
+      maker: '0x123...',
+      makerAsset: '0x456...',
+      // ... other fields
+    };
+    
+    const result = generateOrderHash(order);
+    expect(result.orderHash).toMatch(/^0x[a-fA-F0-9]{64}$/);
+  });
+});
+```
+
+#### E2E Test Example
+```typescript
+import request from 'supertest';
+import { app } from '../index';
+
+describe('Orders API - E2E', () => {
+  it('should create order successfully', async () => {
+    const response = await request(app)
+      .post('/api/orders')
+      .send({ signedOrder })
+      .expect(201);
+      
+    expect(response.body.success).toBe(true);
+  });
+});
+```
+
+### Troubleshooting
+
+#### Common Issues
+
+1. **Database Connection Errors**: Ensure you're using `NODE_ENV=development` for e2e tests
+2. **Missing Tables**: Run `npm run migrate` before running e2e tests
+3. **Signature Verification Failures**: Check that test wallets match order maker addresses
+4. **Test Isolation**: Each test should clean up after itself to avoid interference
+
+#### Debug Mode
+
+```bash
+# Run tests with debug logging
+DEBUG=* npm test -- src/routes/__tests__/orders.e2e.test.ts
+
+# Run specific test with verbose output
+npm test -- --testNamePattern="should create order" --verbose
 ```
 
 ## Deployment
