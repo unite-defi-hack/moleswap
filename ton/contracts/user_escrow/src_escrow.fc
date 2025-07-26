@@ -1,0 +1,38 @@
+#include "../imports/stdlib.fc";
+#include "../imports/op_codes.fc";
+#include "../imports/message.fc";
+#include "../imports/errors.fc";
+#include "../imports/utils.fc";
+#include "storage.fc";
+
+#pragma version >=0.4.4;
+
+const exec_fee = 30000000;  ;; 0.03 TON
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::create) {
+        throw_unless(error::forbidden,
+            equal_slice_bits(sender_address, storage::factory_addr));
+
+        save_data();
+        return ();
+    }
+
+    throw(0xffff);
+}
