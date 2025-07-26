@@ -1,0 +1,20 @@
+#include "stdlib.fc";
+
+int workchain() asm "0 PUSHINT";
+
+cell calculate_state_init(cell data, cell code) inline {
+    return begin_cell()
+        .store_uint(0, 2)
+        .store_dict(code)
+        .store_dict(data)
+        .store_uint(0, 1)
+        .end_cell();
+}
+
+slice calculate_contract_address(cell state_init) inline {
+    return begin_cell().store_uint(4, 3)
+        .store_int(workchain(), 8)
+        .store_uint(cell_hash(state_init), 256)
+        .end_cell()
+        .begin_parse();
+}

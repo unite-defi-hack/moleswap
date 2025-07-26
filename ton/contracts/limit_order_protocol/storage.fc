@@ -1,0 +1,22 @@
+#include "../imports/stdlib.fc";
+
+global slice storage::admin_address;
+global cell storage::src_escrow_code;
+global cell storage::dst_escrow_code;
+
+
+() load_data() inline {
+    slice ds = get_data().begin_parse();
+    storage::admin_address = ds~load_msg_addr();
+    storage::src_escrow_code = ds~load_ref();
+    storage::dst_escrow_code = ds~load_ref();
+}
+
+() save_data() impure inline {
+    set_data(begin_cell()
+        .store_slice(storage::admin_address)
+        .store_ref(storage::src_escrow_code)
+        .store_ref(storage::dst_escrow_code)
+        .end_cell()
+    );
+}
