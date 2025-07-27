@@ -8,11 +8,26 @@ import {
     Sender,
     SendMode,
     TupleReader,
+    toNano,
 } from '@ton/core';
+import { EscrowOp } from './opcodes';
 
 export type SrcEscrowConfig = {
     lop_address: Address;
     order_hash: bigint;
+};
+
+export type SrcOrderConfig = {
+    order_hash: bigint;
+    hashlock: bigint;
+    creation_time: number;
+    expiration_time: number;
+    maker_address: Address;
+    maker_asset: Address;
+    making_amount: bigint;
+    receiver_address: bigint;
+    taker_asset: bigint;
+    taking_amount: bigint;
 };
 
 export function srcEscrowConfigToCell(config: SrcEscrowConfig): Cell {
@@ -35,7 +50,7 @@ export class SrcEscrow implements Contract {
         return new SrcEscrow(contractAddress(workchain, init), init);
     }
 
-    async sendDeploy(provider: ContractProvider, via: Sender, value: bigint) {
+    async sendDeploy(provider: ContractProvider, via: Sender, value: bigint = toNano('0.05')) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
@@ -43,20 +58,49 @@ export class SrcEscrow implements Contract {
         });
     }
 
+    async sendCreate(
+        provider: ContractProvider,
+        via: Sender,
+        order: SrcOrderConfig,
+        query_id: number = 0,
+        value: bigint = toNano('0.05'),
+    ) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(EscrowOp.create, 32)
+                .storeUint(query_id, 64)
+                .storeUint(order.hashlock, 256)
+                .storeUint(order.creation_time, 32)
+                .storeUint(order.expiration_time, 32)
+                .storeRef(
+                    beginCell()
+                        .storeAddress(order.maker_address)
+                        .storeAddress(order.maker_asset)
+                        .storeCoins(order.making_amount)
+                        .storeUint(order.receiver_address, 256)
+                        .endCell(),
+                )
+                .storeRef(beginCell().storeUint(order.taker_asset, 256).storeUint(order.taking_amount, 128).endCell())
+                .endCell(),
+        });
+    }
+
     async getEscrowData(provider: ContractProvider) {
         const result = await provider.get('get_escrow_data', []);
         return {
-            orderHash: result.stack.readNumber(),
-            hashlock: result.stack.readNumber(),
+            lopAddress: result.stack.readAddress(),
+            orderHash: result.stack.readBigNumber(),
+            hashlock: result.stack.readBigNumber(),
             creationTime: result.stack.readNumber(),
             expirationTime: result.stack.readNumber(),
             makerAddress: result.stack.readAddress(),
             makerAssetAddress: result.stack.readAddress(),
             makerAssetAmount: result.stack.readBigNumber(),
-            receiverAddress: result.stack.readAddress(),
-            takerAssetAddress: result.stack.readAddress(),
+            receiverAddress: result.stack.readBigNumber(),
+            takerAssetAddress: result.stack.readBigNumber(),
             takerAssetAmount: result.stack.readBigNumber(),
-            takerAddress: this.readStringOrAddress(result.stack),
         };
     }
 
@@ -79,13 +123,5 @@ export class SrcEscrow implements Contract {
             },
         ]);
         return res.stack.readBigNumber();
-    }
-
-    readStringOrAddress(stack: TupleReader) {
-        try {
-            return stack.readAddress();
-        } catch (e) {
-            return '';
-        }
     }
 }

@@ -5,7 +5,7 @@ global cell storage::src_escrow_code;
 global cell storage::dst_escrow_code;
 
 
-() load_data() inline {
+() load_data() impure inline {
     slice ds = get_data().begin_parse();
     storage::admin_address = ds~load_msg_addr();
     storage::src_escrow_code = ds~load_ref();

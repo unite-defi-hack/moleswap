@@ -37,7 +37,8 @@ const reserve_fee = 1000000;  ;; 0.001 TON
         .store_op(op::create)
         .store_query_id(query_id)
         .store_uint(hashlock, 256)
-        .store_uint(expiration_time, 64)
+        .store_uint(now(), 32) ;; creation time
+        .store_uint(expiration_time, 32)
         .store_ref(
             begin_cell()
                 .store_slice(maker_address)

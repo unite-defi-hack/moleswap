@@ -1,10 +1,11 @@
 #include "../imports/stdlib.fc";
 #include "storage.fc";
 
-(int, int, int, int, int, int, int, slice, slice, int, slice) get_escrow_data() method_id {
+(slice, int, int, int, int, slice, slice, int, int, int, int) get_escrow_data() method_id {
     load_data();
 
     return (
+        storage::lop_address,
         storage::order_hash,
         storage::hashlock,
         storage::creation_time,
@@ -14,8 +15,7 @@
         storage::maker_asset_amount,
         storage::receiver_addr,
         storage::taker_asset_addr,
-        storage::taker_asset_amount,
-        storage::taker_addr
+        storage::taker_asset_amount
     );
 }
 
@@ -25,7 +25,7 @@
     int h = begin_cell()
         .store_uint(secret, 256)
         .hash_keccak256();
-    return h == storage::hash_key;
+    return h == storage::hashlock;
 }
 
 (int) get_hash(int secret) method_id {
