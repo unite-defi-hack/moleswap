@@ -1,3 +1,8 @@
 const int error::not_enough_ton = 400;
 
 const int error::forbidden = 403;
+
+const int error::wrong_workchain = 405;
+const int error::already_claimed = 406;
+const int error::wrong_secret = 407;
+const int error::not_implemented = 501;

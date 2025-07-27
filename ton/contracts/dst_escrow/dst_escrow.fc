@@ -2,6 +2,7 @@
 #include "../imports/op_codes.fc";
 #include "../imports/message.fc";
 #include "../imports/errors.fc";
+#include "../imports/utils.fc";
 #include "storage.fc";
 
 #pragma version >=0.4.4;
@@ -31,6 +32,34 @@ const exec_fee = 30000000;  ;; 0.03 TON
 
         save_data();
         return ();
+    }
+
+    if (op == op::withdraw) {
+        throw_unless(error::forbidden, equal_slice_bits(sender_address, storage::resolver_addr));
+
+        int secret = in_msg_body~load_uint(256);
+        int calculated_hash = begin_cell()
+            .store_uint(secret, 256)
+            .hash_keccak256();
+        throw_unless(error::wrong_secret, calculated_hash == storage::hash_key);
+
+        destruct_and_pay(storage::receiver_addr);
+        return ();
+    }
+
+    if (op == op::public_withdraw) {
+        throw(error::not_implemented);
+        ;; return ();
+    }
+
+    if (op == op::cancel) {
+        throw(error::not_implemented);
+        ;; return ();
+    }
+
+    if (op == op::rescue_funds) {
+        throw(error::not_implemented);
+        ;; return ();
     }
 
     throw(0xffff);

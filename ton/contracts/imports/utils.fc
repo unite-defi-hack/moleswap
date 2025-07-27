@@ -1,4 +1,6 @@
 #include "stdlib.fc";
+#include "errors.fc";
+#include "message.fc";
 
 int workchain() asm "0 PUSHINT";
 
@@ -17,4 +19,23 @@ slice calculate_contract_address(cell state_init) inline {
         .store_uint(cell_hash(state_init), 256)
         .end_cell()
         .begin_parse();
+}
+
+int is_resolvable?(slice addr) inline {
+    (int wc, _) = parse_std_addr(addr);
+    return wc == workchain();
+}
+
+() force_chain(slice addr) impure {
+    throw_unless(error::wrong_workchain, is_resolvable?(addr));
+}
+
+() destruct_and_pay(slice to_address) impure {
+    cell msg = begin_cell()
+        .store_msg_flag(msg_flag::bounceable)
+        .store_slice(to_address)
+        .store_coins(0)
+        .store_msgbody_prefix_slice()
+        .end_cell();
+    send_raw_message(msg, CARRY_REMAINING_BALANCE + SELFDESTRUCT_ON_EMPTY);
 }
