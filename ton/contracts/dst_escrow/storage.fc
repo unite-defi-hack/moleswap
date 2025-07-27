@@ -1,6 +1,6 @@
 #include "../imports/stdlib.fc";
 
-global slice storage::factory_addr;
+global slice storage::lop_address;
 global int storage::order_hash;
 
 global int storage::hashlock;
@@ -12,14 +12,14 @@ global int storage::maker_asset_addr;
 global int storage::maker_asset_amount;
 global slice storage::receiver_addr;
 
+global slice storage::taker_addr;
 global slice storage::taker_asset_addr;
 global int storage::taker_asset_amount;
-global slice storage::taker_addr;
 
 
-() load_data() inline {
+() load_data() impure inline {
     slice ds = get_data().begin_parse();
-    storage::factory_addr = ds~load_msg_addr();
+    storage::lop_address = ds~load_msg_addr();
     storage::order_hash = ds~load_uint(256);
 
     if (slice_empty?(ds)) { return (); }
@@ -35,14 +35,14 @@ global slice storage::taker_addr;
     storage::receiver_addr = ds_maker~load_msg_addr();
 
     slice ds_taker = (ds~load_ref()).begin_parse();
+    storage::taker_addr = ds_taker~load_msg_addr();
     storage::taker_asset_addr = ds_taker~load_msg_addr();
     storage::taker_asset_amount = ds_taker~load_coins();
-    storage::taker_addr = (~ ds_taker.slice_empty?()) ? ds_taker~load_msg_addr() : "";
 }
 
 () save_data() impure inline {
     set_data(begin_cell()
-        .store_slice(storage::factory_addr)
+        .store_slice(storage::lop_address)
         .store_uint(storage::order_hash, 256)
         .store_uint(storage::hashlock, 256)
         .store_uint(storage::creation_time, 32)
@@ -57,9 +57,9 @@ global slice storage::taker_addr;
         )
         .store_ref(
             begin_cell()
+                .store_slice(storage::taker_addr)
                 .store_slice(storage::taker_asset_addr)
                 .store_coins(storage::taker_asset_amount)
-                .store_slice(storage::taker_addr)
                 .end_cell()
         )
         .end_cell());
