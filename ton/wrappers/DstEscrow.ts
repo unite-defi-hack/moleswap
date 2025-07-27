@@ -11,24 +11,11 @@ import {
     toNano,
 } from '@ton/core';
 import { EscrowOp } from './opcodes';
+import { OrderConfig } from './types';
 
 export type DstEscrowConfig = {
     lop_address: Address;
     order_hash: bigint;
-};
-
-export type DstOrderConfig = {
-    order_hash: bigint;
-    hashlock: bigint;
-    creation_time: number;
-    expiration_time: number;
-    maker_address: bigint;
-    maker_asset: bigint;
-    making_amount: bigint;
-    receiver_address: Address;
-    taker_asset: Address;
-    taking_amount: bigint;
-    taker_address: Address;
 };
 
 export function dstEscrowConfigToCell(config: DstEscrowConfig): Cell {
@@ -62,7 +49,7 @@ export class DstEscrow implements Contract {
     async sendCreate(
         provider: ContractProvider,
         via: Sender,
-        order: DstOrderConfig,
+        order: OrderConfig,
         query_id: number = 0,
         value: bigint = toNano('0.05'),
     ) {
@@ -77,16 +64,16 @@ export class DstEscrow implements Contract {
                 .storeUint(order.expiration_time, 32)
                 .storeRef(
                     beginCell()
-                        .storeUint(order.maker_address, 256)
-                        .storeUint(order.maker_asset, 256)
+                        .storeUint(order.maker_address as bigint, 256)
+                        .storeUint(order.maker_asset as bigint, 256)
                         .storeUint(order.making_amount, 128)
-                        .storeAddress(order.receiver_address)
+                        .storeAddress(order.receiver_address as Address)
                         .endCell(),
                 )
                 .storeRef(
                     beginCell()
-                        .storeAddress(order.taker_address)
-                        .storeAddress(order.taker_asset)
+                        .storeAddress(order.taker_address as Address)
+                        .storeAddress(order.taker_asset as Address)
                         .storeCoins(order.taking_amount)
                         .endCell(),
                 )

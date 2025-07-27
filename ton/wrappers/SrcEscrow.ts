@@ -7,27 +7,14 @@ import {
     ContractProvider,
     Sender,
     SendMode,
-    TupleReader,
     toNano,
 } from '@ton/core';
 import { EscrowOp } from './opcodes';
+import { OrderConfig } from './types';
 
 export type SrcEscrowConfig = {
     lop_address: Address;
     order_hash: bigint;
-};
-
-export type SrcOrderConfig = {
-    order_hash: bigint;
-    hashlock: bigint;
-    creation_time: number;
-    expiration_time: number;
-    maker_address: Address;
-    maker_asset: Address;
-    making_amount: bigint;
-    receiver_address: bigint;
-    taker_asset: bigint;
-    taking_amount: bigint;
 };
 
 export function srcEscrowConfigToCell(config: SrcEscrowConfig): Cell {
@@ -61,7 +48,7 @@ export class SrcEscrow implements Contract {
     async sendCreate(
         provider: ContractProvider,
         via: Sender,
-        order: SrcOrderConfig,
+        order: OrderConfig,
         query_id: number = 0,
         value: bigint = toNano('0.05'),
     ) {
@@ -76,13 +63,18 @@ export class SrcEscrow implements Contract {
                 .storeUint(order.expiration_time, 32)
                 .storeRef(
                     beginCell()
-                        .storeAddress(order.maker_address)
-                        .storeAddress(order.maker_asset)
+                        .storeAddress(order.maker_address as Address)
+                        .storeAddress(order.maker_asset as Address)
                         .storeCoins(order.making_amount)
-                        .storeUint(order.receiver_address, 256)
+                        .storeUint(order.receiver_address as bigint, 256)
                         .endCell(),
                 )
-                .storeRef(beginCell().storeUint(order.taker_asset, 256).storeUint(order.taking_amount, 128).endCell())
+                .storeRef(
+                    beginCell()
+                        .storeUint(order.taker_asset as bigint, 256)
+                        .storeUint(order.taking_amount, 128)
+                        .endCell(),
+                )
                 .endCell(),
         });
     }
