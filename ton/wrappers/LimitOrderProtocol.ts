@@ -1,5 +1,16 @@
-import { Address, beginCell, Cell, Contract, contractAddress, ContractProvider, Sender, SendMode } from '@ton/core';
-import { Op } from './opcodes';
+import {
+    Address,
+    beginCell,
+    Cell,
+    Contract,
+    contractAddress,
+    ContractProvider,
+    Sender,
+    SendMode,
+    toNano,
+} from '@ton/core';
+import { LopOp } from './opcodes';
+import { OrderConfig } from './types';
 
 export type EscrowFactoryConfig = {
     admin: Address;
@@ -42,37 +53,28 @@ export class LimitOrderProtocol implements Contract {
     async sendCreateOrder(
         provider: ContractProvider,
         via: Sender,
-        opts: {
-            value: bigint;
-            queryId: number;
-            makerAddress: Address;
-            makerAsset: Address;
-            makingAmount: bigint;
-            receiverAddress: bigint;
-            takerAsset: bigint;
-            takingAmount: bigint;
-            salt: bigint;
-            hashlock: bigint;
-            expirationTime: bigint;
-        },
+        order: OrderConfig,
+        value: bigint = toNano(0.05),
+        queryId: number = 0,
     ) {
         return await provider.internal(via, {
-            value: opts.value + opts.makingAmount,
+            value: value + order.making_amount,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(Op.create_order, 32)
-                .storeUint(opts.queryId, 64)
-                .storeAddress(opts.makerAddress)
-                .storeAddress(opts.makerAsset)
-                .storeUint(opts.makingAmount, 128)
-                .storeUint(opts.receiverAddress, 256)
+                .storeUint(LopOp.create_order, 32)
+                .storeUint(queryId, 64)
+                .storeAddress(order.maker_address as Address)
+                .storeAddress(order.maker_asset as Address)
+                .storeCoins(order.making_amount)
+                .storeUint(order.receiver_address as bigint, 256)
                 .storeRef(
                     beginCell()
-                        .storeUint(opts.takerAsset, 256)
-                        .storeUint(opts.takingAmount, 128)
-                        .storeUint(opts.salt, 128)
-                        .storeUint(opts.hashlock, 256)
-                        .storeUint(opts.expirationTime, 64)
+                        .storeUint(order.taker_asset as bigint, 256)
+                        .storeUint(order.taking_amount, 128)
+                        .storeUint(order.salt!!, 256)
+                        .storeUint(order.hashlock, 256)
+                        .storeUint(order.creation_time, 32)
+                        .storeUint(order.expiration_time, 32)
                         .endCell(),
                 )
                 .endCell(),
@@ -97,5 +99,29 @@ export class LimitOrderProtocol implements Contract {
             },
         ]);
         return result.stack.readAddress();
+    }
+
+    static calculateOrderHash(order: OrderConfig): bigint {
+        const orderData = beginCell()
+            .storeAddress(order.maker_address as Address)
+            .storeAddress(order.maker_asset as Address)
+            .storeCoins(order.making_amount)
+            .storeUint(order.receiver_address as bigint, 256)
+            .storeRef(
+                beginCell()
+                    .storeUint(order.taker_asset as bigint, 256)
+                    .storeUint(order.taking_amount, 128)
+                    .endCell(),
+            )
+            .storeRef(
+                beginCell()
+                    .storeUint(order.hashlock, 256)
+                    .storeUint(order.salt!!, 256)
+                    .storeUint(order.creation_time, 32)
+                    .storeUint(order.expiration_time, 32)
+                    .endCell(),
+            )
+            .endCell();
+        return BigInt('0x' + orderData.hash().toString('hex'));
     }
 }
