@@ -1,3 +1,9 @@
-const op::create_ton_order = "create_ton_order"c;
-const op::create = "create"c;
 
+const op::create = "create"c;
+;; const op::claim_order = "claim_order"c;
+const op::withdraw = "withdraw"c;
+const op::withdraw_to = "withdraw_to"c;
+const op::public_withdraw = "public_withdraw"c;
+const op::cancel = "cancel"c;
+const op::public_cancel = "public_cancel"c;
+const op::rescue_funds = "rescue_funds"c;

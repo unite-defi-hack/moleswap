@@ -1,0 +1,79 @@
+#include "../imports/stdlib.fc";
+#include "../imports/op_codes.fc";
+#include "../imports/message.fc";
+#include "../imports/errors.fc";
+#include "../imports/utils.fc";
+#include "storage.fc";
+
+#pragma version >=0.4.4;
+
+const exec_fee = 30000000;  ;; 0.03 TON
+
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore empty messages
+        return ();
+    }
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+    slice sender_address = cs~load_msg_addr();
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::create) {
+        throw_unless(error::forbidden,
+            equal_slice_bits(sender_address, storage::factory_addr));
+
+        storage::hashlock = in_msg_body~load_uint(256);
+        storage::expiration_time = in_msg_body~load_uint(64);
+
+        save_data();
+        return ();
+    }
+
+    if (op == op::withdraw) {
+        throw_unless(error::forbidden, equal_slice_bits(sender_address, storage::resolver_addr));
+
+        int secret = in_msg_body~load_uint(256);
+        int calculated_hash = begin_cell()
+            .store_uint(secret, 256)
+            .hash_keccak256();
+        throw_unless(error::wrong_secret, calculated_hash == storage::hash_key);
+
+        destruct_and_pay(storage::resolver_addr);
+        return ();
+    }
+
+    if (op == op::withdraw_to) {
+        throw(error::not_implemented);
+        ;; return ();
+    }
+
+    if (op == op::public_withdraw) {
+        throw(error::not_implemented);
+        ;; return ();
+    }
+
+    if (op == op::cancel) {
+        throw(error::not_implemented);
+        ;; return ();
+    }
+
+    if (op == op::public_cancel) {
+        throw(error::not_implemented);
+        ;; return ();
+    }
+
+    if (op == op::rescue_funds) {
+        throw(error::not_implemented);
+        ;; return ();
+    }
+
+    throw(0xffff);
+}
