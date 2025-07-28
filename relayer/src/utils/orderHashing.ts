@@ -1,5 +1,11 @@
 import { ethers } from 'ethers';
-import { Order, EIP712Domain, EIP712Types, OrderHashResult } from '../types/orders';
+import { 
+  Order, 
+  EIP712Domain, 
+  EIP712Types, 
+  OrderHashResult,
+  OrderValidationResult
+} from '../types/orders';
 
 /**
  * EIP-712 domain configuration for order signing
@@ -17,12 +23,12 @@ export const ORDER_DOMAIN: EIP712Domain = {
 export const ORDER_TYPES: EIP712Types = {
   Order: [
     { name: 'maker', type: 'address' },
-    { name: 'makerAsset', type: 'address' },
-    { name: 'takerAsset', type: 'address' },
+    { name: 'srcAssetAddress', type: 'address' },
+    { name: 'dstAssetAddress', type: 'address' },
     { name: 'makerTraits', type: 'bytes32' },
     { name: 'salt', type: 'uint256' },
-    { name: 'makingAmount', type: 'uint256' },
-    { name: 'takingAmount', type: 'uint256' },
+    { name: 'srcAmount', type: 'uint256' },
+    { name: 'dstAmount', type: 'uint256' },
     { name: 'receiver', type: 'address' }
   ]
 };
@@ -33,19 +39,54 @@ export const ORDER_TYPES: EIP712Types = {
  * @param domain - Optional domain override
  * @returns Order hash and domain information
  */
-export function generateOrderHash(
-  order: Order, 
-  domain?: Partial<EIP712Domain>
-): OrderHashResult {
-  const orderDomain = { ...ORDER_DOMAIN, ...domain };
-  
+export function generateOrderHash(order: Order): OrderHashResult {
+  // Validate order before hashing
+  const validation = validateOrder(order);
+  if (!validation.valid) {
+    throw new Error(`Invalid order: ${validation.errors?.join(', ')}`);
+  }
+
+  // Create EIP-712 domain
+  const domain: EIP712Domain = {
+    name: 'MoleSwap Relayer',
+    version: '1.0.0',
+    chainId: 1, // Default chain ID, can be overridden
+    verifyingContract: '0x0000000000000000000000000000000000000000' // Placeholder
+  };
+
+  // Create EIP-712 types
+  const types: EIP712Types = {
+    Order: [
+      { name: 'maker', type: 'address' },
+      { name: 'srcAssetAddress', type: 'address' },
+      { name: 'dstAssetAddress', type: 'address' },
+      { name: 'makerTraits', type: 'bytes32' },
+      { name: 'salt', type: 'uint256' },
+      { name: 'srcAmount', type: 'uint256' },
+      { name: 'dstAmount', type: 'uint256' },
+      { name: 'receiver', type: 'address' }
+    ]
+  };
+
+  // Create the message to sign
+  const message = {
+    maker: order.maker,
+    srcAssetAddress: order.srcAssetAddress,
+    dstAssetAddress: order.dstAssetAddress,
+    makerTraits: order.makerTraits,
+    salt: order.salt,
+    srcAmount: order.srcAmount,
+    dstAmount: order.dstAmount,
+    receiver: order.receiver
+  };
+
   // Generate the hash
-  const orderHash = ethers.TypedDataEncoder.hash(orderDomain, ORDER_TYPES, order);
-  
+  const orderHash = ethers.TypedDataEncoder.hash(domain, types, message);
+
   return {
     orderHash,
-    domain: orderDomain,
-    types: ORDER_TYPES
+    domain,
+    types
   };
 }
 
@@ -146,39 +187,38 @@ export function validateOrderHash(orderHash: string): { valid: boolean; error?: 
 /**
  * Create order hash from components
  * @param maker - Maker address
- * @param makerAsset - Maker asset address
- * @param takerAsset - Taker asset address
+ * @param srcAssetAddress - Source asset address
+ * @param dstAssetAddress - Destination asset address
  * @param makerTraits - Hashlock (secret hash)
  * @param salt - Order salt
- * @param makingAmount - Making amount
- * @param takingAmount - Taking amount
+ * @param srcAmount - Source amount
+ * @param dstAmount - Destination amount
  * @param receiver - Receiver address
  * @param domain - Optional domain override
  * @returns Order hash result
  */
 export function createOrderHashFromComponents(
   maker: string,
-  makerAsset: string,
-  takerAsset: string,
+  srcAssetAddress: string,
+  dstAssetAddress: string,
   makerTraits: string,
   salt: string,
-  makingAmount: string,
-  takingAmount: string,
-  receiver: string,
-  domain?: Partial<EIP712Domain>
+  srcAmount: string,
+  dstAmount: string,
+  receiver: string
 ): OrderHashResult {
   const order: Order = {
     maker,
-    makerAsset,
-    takerAsset,
+    srcAssetAddress,
+    dstAssetAddress,
     makerTraits,
     salt,
-    makingAmount,
-    takingAmount,
+    srcAmount,
+    dstAmount,
     receiver
   };
   
-  return generateOrderHash(order, domain);
+  return generateOrderHash(order);
 }
 
 /**
@@ -198,12 +238,12 @@ export function getDomainSeparator(domain: EIP712Domain): string {
 export function formatOrderForSigning(order: Order): string {
   return `Order:
   Maker: ${order.maker}
-  Maker Asset: ${order.makerAsset}
-  Taker Asset: ${order.takerAsset}
+  Source Asset: ${order.srcAssetAddress}
+  Destination Asset: ${order.dstAssetAddress}
   Maker Traits: ${order.makerTraits}
   Salt: ${order.salt}
-  Making Amount: ${order.makingAmount}
-  Taking Amount: ${order.takingAmount}
+  Source Amount: ${order.srcAmount}
+  Destination Amount: ${order.dstAmount}
   Receiver: ${order.receiver}`;
 }
 
@@ -212,70 +252,68 @@ export function formatOrderForSigning(order: Order): string {
  * @param order - The order to validate
  * @returns Validation result
  */
-export function validateOrderForHashing(order: Order): { valid: boolean; errors?: string[] } {
+export function validateOrder(order: Order): OrderValidationResult {
   const errors: string[] = [];
-  
-  // Check required fields
-  if (!order.maker) errors.push('Maker address is required');
-  if (!order.makerAsset) errors.push('Maker asset is required');
-  if (!order.takerAsset) errors.push('Taker asset is required');
+
+  // Required fields validation
+  if (!order.maker) errors.push('Maker is required');
+  if (!order.srcAssetAddress) errors.push('Source asset address is required');
+  if (!order.dstAssetAddress) errors.push('Destination asset address is required');
   if (!order.makerTraits) errors.push('Maker traits (hashlock) is required');
   if (!order.salt) errors.push('Salt is required');
-  if (!order.makingAmount) errors.push('Making amount is required');
-  if (!order.takingAmount) errors.push('Taking amount is required');
+  if (!order.srcAmount) errors.push('Source amount is required');
+  if (!order.dstAmount) errors.push('Destination amount is required');
   if (!order.receiver) errors.push('Receiver is required');
-  
-  // Validate address formats
+
+  // Address validation
   if (order.maker && !ethers.isAddress(order.maker)) {
-    errors.push('Invalid maker address format');
+    errors.push('Maker must be a valid Ethereum address');
   }
-  if (order.makerAsset && !ethers.isAddress(order.makerAsset)) {
-    errors.push('Invalid maker asset address format');
+  if (order.srcAssetAddress && !ethers.isAddress(order.srcAssetAddress)) {
+    errors.push('Source asset address must be a valid Ethereum address');
   }
-  if (order.takerAsset && !ethers.isAddress(order.takerAsset)) {
-    errors.push('Invalid taker asset address format');
+  if (order.dstAssetAddress && !ethers.isAddress(order.dstAssetAddress)) {
+    errors.push('Destination asset address must be a valid Ethereum address');
   }
   if (order.receiver && !ethers.isAddress(order.receiver)) {
-    errors.push('Invalid receiver address format');
+    errors.push('Receiver must be a valid Ethereum address');
   }
-  
-  // Validate hex strings
-  if (order.makerTraits && !ethers.isHexString(order.makerTraits, 32)) {
-    errors.push('Maker traits must be a valid 32-byte hex string');
-  }
-  
-  // Validate amounts
+
+  // Amount validation
   try {
-    if (order.makingAmount) {
-      const makingAmount = ethers.getBigInt(order.makingAmount);
-      if (makingAmount === 0n) {
-        errors.push('Making amount cannot be zero');
+    if (order.srcAmount) {
+      const srcAmount = ethers.getBigInt(order.srcAmount);
+      if (srcAmount <= 0n) {
+        errors.push('Source amount must be greater than 0');
       }
     }
-    if (order.takingAmount) {
-      const takingAmount = ethers.getBigInt(order.takingAmount);
-      if (takingAmount === 0n) {
-        errors.push('Taking amount cannot be zero');
+    if (order.dstAmount) {
+      const dstAmount = ethers.getBigInt(order.dstAmount);
+      if (dstAmount <= 0n) {
+        errors.push('Destination amount must be greater than 0');
       }
     }
   } catch (error) {
     errors.push('Invalid amount format');
   }
-  
-  // Validate salt
+
+  // Salt validation
   try {
     if (order.salt) {
-      const salt = ethers.getBigInt(order.salt);
-      if (salt === 0n) {
-        errors.push('Salt cannot be zero');
-      }
+      ethers.getBigInt(order.salt);
     }
   } catch (error) {
     errors.push('Invalid salt format');
   }
+
+  const result: OrderValidationResult = {
+    valid: errors.length === 0
+  };
   
-  return {
-    valid: errors.length === 0,
-    errors: errors.length > 0 ? errors : undefined
-  } as { valid: boolean; errors?: string[] };
+  if (errors.length > 0) {
+    result.errors = errors;
+    result.details = { errors };
+  }
+  
+  return result;
 } 

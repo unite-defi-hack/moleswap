@@ -28,10 +28,10 @@ describe('Orders API - End to End Tests', () => {
       const validOrderData = {
         order: {
           maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          makingAmount: '1000000000000000000',
-          takingAmount: '2000000000000000000',
+          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          srcAmount: '1000000000000000000',
+          dstAmount: '2000000000000000000',
           receiver: '0x0000000000000000000000000000000000000000'
         }
       };
@@ -49,10 +49,10 @@ describe('Orders API - End to End Tests', () => {
       // Validate order structure
       const order = response.body.data.orderToSign;
       expect(order.maker).toBe(validOrderData.order.maker);
-      expect(order.makerAsset).toBe(validOrderData.order.makerAsset);
-      expect(order.takerAsset).toBe(validOrderData.order.takerAsset);
-      expect(order.makingAmount).toBe(validOrderData.order.makingAmount);
-      expect(order.takingAmount).toBe(validOrderData.order.takingAmount);
+      expect(order.srcAssetAddress).toBe(validOrderData.order.srcAssetAddress);
+      expect(order.dstAssetAddress).toBe(validOrderData.order.dstAssetAddress);
+      expect(order.srcAmount).toBe(validOrderData.order.srcAmount);
+      expect(order.dstAmount).toBe(validOrderData.order.dstAmount);
       expect(order.receiver).toBe(validOrderData.order.receiver);
       
       // Validate generated fields
@@ -70,17 +70,31 @@ describe('Orders API - End to End Tests', () => {
 
   describe('POST /api/orders - E2E', () => {
     it('should create a real order in the database', async () => {
-      // Get the order data from the previous test
-      const orderData = (global as any).generatedOrderData;
-      expect(orderData).toBeDefined();
-
       // Create a real signature using ethers.js
       const wallet = ethers.Wallet.createRandom();
-      // Update the order to use the wallet's address as the maker
-      const orderToSign = {
-        ...orderData.orderToSign,
-        maker: wallet.address
+      
+      // Generate order data first with the wallet's address
+      const validOrderData = {
+        order: {
+          maker: wallet.address,
+          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          srcAmount: '1000000000000000000',
+          dstAmount: '2000000000000000000',
+          receiver: '0x0000000000000000000000000000000000000000'
+        }
       };
+
+      const orderDataResponse = await request(app)
+        .post('/api/orders/data')
+        .send(validOrderData)
+        .expect(200);
+
+      const orderData = orderDataResponse.body.data;
+      expect(orderData).toBeDefined();
+
+      // Use the order data as is, since it already has the correct maker address
+      const orderToSign = orderData.orderToSign;
       
       // Create the typed data for signing - use the same domain as the orderHashing utility
       const domain = {
@@ -93,12 +107,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'makerAsset', type: 'address' },
-          { name: 'takerAsset', type: 'address' },
+          { name: 'srcAssetAddress', type: 'address' },
+          { name: 'dstAssetAddress', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'makingAmount', type: 'uint256' },
-          { name: 'takingAmount', type: 'uint256' },
+          { name: 'srcAmount', type: 'uint256' },
+          { name: 'dstAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -127,14 +141,30 @@ describe('Orders API - End to End Tests', () => {
     });
 
     it('should reject duplicate order hash', async () => {
-      const orderData = (global as any).generatedOrderData;
-      
       // First, create a valid order with a wallet that matches the maker address
       const wallet1 = ethers.Wallet.createRandom();
-      const orderToSign1 = {
-        ...orderData.orderToSign,
-        maker: wallet1.address
+      
+      // Generate order data first with the wallet's address
+      const validOrderData = {
+        order: {
+          maker: wallet1.address,
+          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          srcAmount: '1000000000000000000',
+          dstAmount: '2000000000000000000',
+          receiver: '0x0000000000000000000000000000000000000000'
+        }
       };
+
+      const orderDataResponse = await request(app)
+        .post('/api/orders/data')
+        .send(validOrderData)
+        .expect(200);
+
+      const orderData = orderDataResponse.body.data;
+      
+      // Use the order data as is, since it already has the correct maker address
+      const orderToSign1 = orderData.orderToSign;
       
       const domain = {
         name: 'MoleSwap Relayer',
@@ -146,12 +176,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'makerAsset', type: 'address' },
-          { name: 'takerAsset', type: 'address' },
+          { name: 'srcAssetAddress', type: 'address' },
+          { name: 'dstAssetAddress', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'makingAmount', type: 'uint256' },
-          { name: 'takingAmount', type: 'uint256' },
+          { name: 'srcAmount', type: 'uint256' },
+          { name: 'dstAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -209,7 +239,28 @@ describe('Orders API - End to End Tests', () => {
     });
 
     it('should reject invalid order data', async () => {
-      const orderData = (global as any).generatedOrderData;
+      // Create an invalid order with wrong address format
+      const wallet = ethers.Wallet.createRandom();
+      
+      // Generate order data first with the wallet's address
+      const validOrderData = {
+        order: {
+          maker: wallet.address,
+          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          srcAmount: '1000000000000000000',
+          dstAmount: '2000000000000000000',
+          receiver: '0x0000000000000000000000000000000000000000'
+        }
+      };
+
+      const orderDataResponse = await request(app)
+        .post('/api/orders/data')
+        .send(validOrderData)
+        .expect(200);
+
+      const orderData = orderDataResponse.body.data;
+      
       // Create an invalid order with wrong address format
       const orderToSign = { 
         ...orderData.orderToSign, 
@@ -238,7 +289,6 @@ describe('Orders API - End to End Tests', () => {
 
     beforeAll(async () => {
       // Create multiple test orders for querying
-      const orderData = (global as any).generatedOrderData;
       const domain = {
         name: 'MoleSwap Relayer',
         version: '1.0.0',
@@ -248,12 +298,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'makerAsset', type: 'address' },
-          { name: 'takerAsset', type: 'address' },
+          { name: 'srcAssetAddress', type: 'address' },
+          { name: 'dstAssetAddress', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'makingAmount', type: 'uint256' },
-          { name: 'takingAmount', type: 'uint256' },
+          { name: 'srcAmount', type: 'uint256' },
+          { name: 'dstAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -261,10 +311,28 @@ describe('Orders API - End to End Tests', () => {
       // Create 3 test orders with different makers
       for (let i = 0; i < 3; i++) {
         const wallet = ethers.Wallet.createRandom();
-        const orderToSign = {
-          ...orderData.orderToSign,
-          maker: wallet.address
+        
+        // Generate order data for this wallet
+        const validOrderData = {
+          order: {
+            maker: wallet.address,
+            srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+            dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+            srcAmount: '1000000000000000000',
+            dstAmount: '2000000000000000000',
+            receiver: '0x0000000000000000000000000000000000000000'
+          }
         };
+
+        const orderDataResponse = await request(app)
+          .post('/api/orders/data')
+          .send(validOrderData)
+          .expect(200);
+
+        const orderData = orderDataResponse.body.data;
+        
+        // Use the order data as is, since it already has the correct maker address
+        const orderToSign = orderData.orderToSign;
         const signature = await wallet.signTypedData(domain, types, orderToSign);
         const signedOrder = { order: orderToSign, signature };
 
@@ -347,7 +415,7 @@ describe('Orders API - End to End Tests', () => {
       
       // All returned orders should have the specified makerAsset
       response.body.data.orders.forEach((order: any) => {
-        expect(order.order.makerAsset).toBe(makerAsset);
+        expect(order.order.srcAssetAddress).toBe(makerAsset);
       });
     });
 
@@ -363,7 +431,7 @@ describe('Orders API - End to End Tests', () => {
       
       // All returned orders should have the specified takerAsset
       response.body.data.orders.forEach((order: any) => {
-        expect(order.order.takerAsset).toBe(takerAsset);
+        expect(order.order.dstAssetAddress).toBe(takerAsset);
       });
     });
 
@@ -394,8 +462,8 @@ describe('Orders API - End to End Tests', () => {
       // All returned orders should match all filters
       response.body.data.orders.forEach((order: any) => {
         expect(order.status).toBe('active');
-        expect(order.order.makerAsset).toBe(makerAsset);
-        expect(order.order.takerAsset).toBe(takerAsset);
+        expect(order.order.srcAssetAddress).toBe(makerAsset);
+        expect(order.order.dstAssetAddress).toBe(takerAsset);
       });
     });
 
@@ -415,12 +483,29 @@ describe('Orders API - End to End Tests', () => {
 
     beforeAll(async () => {
       // Create a test order for status updates
-      const orderData = (global as any).generatedOrderData;
       const wallet = ethers.Wallet.createRandom();
-      const orderToSign = {
-        ...orderData.orderToSign,
-        maker: wallet.address
+      
+      // Generate order data first with the wallet's address
+      const validOrderData = {
+        order: {
+          maker: wallet.address,
+          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          srcAmount: '1000000000000000000',
+          dstAmount: '2000000000000000000',
+          receiver: '0x0000000000000000000000000000000000000000'
+        }
       };
+
+      const orderDataResponse = await request(app)
+        .post('/api/orders/data')
+        .send(validOrderData)
+        .expect(200);
+
+      const orderData = orderDataResponse.body.data;
+      
+      // Use the order data as is, since it already has the correct maker address
+      const orderToSign = orderData.orderToSign;
       
       const domain = {
         name: 'MoleSwap Relayer',
@@ -431,12 +516,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'makerAsset', type: 'address' },
-          { name: 'takerAsset', type: 'address' },
+          { name: 'srcAssetAddress', type: 'address' },
+          { name: 'dstAssetAddress', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'makingAmount', type: 'uint256' },
-          { name: 'takingAmount', type: 'uint256' },
+          { name: 'srcAmount', type: 'uint256' },
+          { name: 'dstAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -514,12 +599,29 @@ describe('Orders API - End to End Tests', () => {
 
     it('should update status without reason', async () => {
       // Create a new order for this test
-      const orderData = (global as any).generatedOrderData;
       const wallet = ethers.Wallet.createRandom();
-      const orderToSign = {
-        ...orderData.orderToSign,
-        maker: wallet.address
+      
+      // Generate order data first with the wallet's address
+      const validOrderData = {
+        order: {
+          maker: wallet.address,
+          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          srcAmount: '1000000000000000000',
+          dstAmount: '2000000000000000000',
+          receiver: '0x0000000000000000000000000000000000000000'
+        }
       };
+
+      const orderDataResponse = await request(app)
+        .post('/api/orders/data')
+        .send(validOrderData)
+        .expect(200);
+
+      const orderData = orderDataResponse.body.data;
+      
+      // Use the order data as is, since it already has the correct maker address
+      const orderToSign = orderData.orderToSign;
       
       const domain = {
         name: 'MoleSwap Relayer',
@@ -530,12 +632,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'makerAsset', type: 'address' },
-          { name: 'takerAsset', type: 'address' },
+          { name: 'srcAssetAddress', type: 'address' },
+          { name: 'dstAssetAddress', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'makingAmount', type: 'uint256' },
-          { name: 'takingAmount', type: 'uint256' },
+          { name: 'srcAmount', type: 'uint256' },
+          { name: 'dstAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -561,7 +663,60 @@ describe('Orders API - End to End Tests', () => {
 
   describe('Database Verification', () => {
     it('should verify order was actually stored in database', async () => {
-      const orderHash = (global as any).createdOrderHash;
+      // Create a real signature using ethers.js
+      const wallet = ethers.Wallet.createRandom();
+      
+      // Generate order data first with the wallet's address
+      const validOrderData = {
+        order: {
+          maker: wallet.address,
+          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          srcAmount: '1000000000000000000',
+          dstAmount: '2000000000000000000',
+          receiver: '0x0000000000000000000000000000000000000000'
+        }
+      };
+
+      const orderDataResponse = await request(app)
+        .post('/api/orders/data')
+        .send(validOrderData)
+        .expect(200);
+
+      const orderData = orderDataResponse.body.data;
+      
+      // Use the order data as is, since it already has the correct maker address
+      const orderToSign = orderData.orderToSign;
+      
+      const domain = {
+        name: 'MoleSwap Relayer',
+        version: '1.0.0',
+        chainId: 1,
+        verifyingContract: '0x0000000000000000000000000000000000000000'
+      };
+
+      const types = {
+        Order: [
+          { name: 'maker', type: 'address' },
+          { name: 'srcAssetAddress', type: 'address' },
+          { name: 'dstAssetAddress', type: 'address' },
+          { name: 'makerTraits', type: 'bytes32' },
+          { name: 'salt', type: 'uint256' },
+          { name: 'srcAmount', type: 'uint256' },
+          { name: 'dstAmount', type: 'uint256' },
+          { name: 'receiver', type: 'address' }
+        ]
+      };
+
+      const signature = await wallet.signTypedData(domain, types, orderToSign);
+      const signedOrder = { order: orderToSign, signature };
+
+      const createResponse = await request(app)
+        .post('/api/orders')
+        .send({ signedOrder })
+        .expect(201);
+
+      const orderHash = createResponse.body.data.orderHash;
       expect(orderHash).toBeDefined();
 
       // Import the database service

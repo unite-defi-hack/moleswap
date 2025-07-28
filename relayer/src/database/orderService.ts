@@ -24,14 +24,15 @@ export async function insertOrder(params: InsertOrderParams): Promise<OrderWithM
     order_hash: params.orderHash,
     maker: params.order.maker,
     taker: '', // Taker is not known at creation
-    maker_token: params.order.makerAsset,
-    taker_token: params.order.takerAsset,
-    maker_amount: params.order.makingAmount,
-    taker_amount: params.order.takingAmount,
-    source_chain: '', // Not known at creation
-    destination_chain: '', // Not known at creation
-    source_escrow: '', // Not known at creation
-    destination_escrow: '', // Not known at creation
+    maker_token: params.order.srcAssetAddress,
+    taker_token: params.order.dstAssetAddress,
+    maker_amount: params.order.srcAmount,
+    taker_amount: params.order.dstAmount,
+    receiver: params.order.receiver || '0x0000000000000000000000000000000000000000',
+    source_chain: params.order.srcChainId?.toString() || '',
+    destination_chain: params.order.dstChainId?.toString() || '',
+    source_escrow: params.order.srcEscrowAddress || '',
+    destination_escrow: params.order.dstEscrowAddress || '',
     hashlock: params.hashlock,
     secret: params.secret || null,
     status: params.status,
@@ -94,14 +95,18 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
     return {
       order: {
         maker: order.maker,
-        makerAsset: order.maker_token,
-        takerAsset: order.taker_token,
+        srcAssetAddress: order.maker_token,
+        dstAssetAddress: order.taker_token,
         makerTraits: order.hashlock,
         salt: orderData.salt || '',
-        makingAmount: order.maker_amount,
-        takingAmount: order.taker_amount,
-        receiver: orderData.receiver || '0x0000000000000000000000000000000000000000'
-      },
+        srcAmount: order.maker_amount,
+        dstAmount: order.taker_amount,
+        receiver: orderData.receiver || '0x0000000000000000000000000000000000000000',
+        srcChainId: order.source_chain ? parseInt(order.source_chain) : undefined,
+        dstChainId: order.destination_chain ? parseInt(order.destination_chain) : undefined,
+        srcEscrowAddress: order.source_escrow || undefined,
+        dstEscrowAddress: order.destination_escrow || undefined
+      } as Order,
       orderHash: order.order_hash,
       status: order.status as OrderStatus,
       createdAt: new Date(order.created_at),
@@ -160,14 +165,18 @@ export async function updateOrderStatus(orderHash: string, newStatus: OrderStatu
   return {
     order: {
       maker: updatedOrder.maker,
-      makerAsset: updatedOrder.maker_token,
-      takerAsset: updatedOrder.taker_token,
+      srcAssetAddress: updatedOrder.maker_token,
+      dstAssetAddress: updatedOrder.taker_token,
       makerTraits: updatedOrder.hashlock,
       salt: orderData.salt || '',
-      makingAmount: updatedOrder.maker_amount,
-      takingAmount: updatedOrder.taker_amount,
-      receiver: orderData.receiver || '0x0000000000000000000000000000000000000000'
-    },
+      srcAmount: updatedOrder.maker_amount,
+      dstAmount: updatedOrder.taker_amount,
+      receiver: orderData.receiver || '0x0000000000000000000000000000000000000000',
+      srcChainId: updatedOrder.source_chain ? parseInt(updatedOrder.source_chain) : undefined,
+      dstChainId: updatedOrder.destination_chain ? parseInt(updatedOrder.destination_chain) : undefined,
+      srcEscrowAddress: updatedOrder.source_escrow || undefined,
+      dstEscrowAddress: updatedOrder.destination_escrow || undefined
+    } as Order,
     orderHash: updatedOrder.order_hash,
     status: updatedOrder.status as OrderStatus,
     createdAt: new Date(updatedOrder.created_at),

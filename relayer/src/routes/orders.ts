@@ -69,10 +69,10 @@ router.post('/data', async (req: Request, res: Response) => {
     logger.info('Order data generated successfully', { 
       orderHash,
       maker: order.maker,
-      makerAsset: order.makerAsset,
-      takerAsset: order.takerAsset,
-      makingAmount: order.makingAmount,
-      takingAmount: order.takingAmount,
+      srcAssetAddress: order.srcAssetAddress,
+      dstAssetAddress: order.dstAssetAddress,
+      srcAmount: order.srcAmount,
+      dstAmount: order.dstAmount,
       hashlock: hashlock.slice(0, 10) + '...', // Log partial hashlock for security
       salt: salt.slice(0, 10) + '...' // Log partial salt for security
     });
@@ -91,6 +91,10 @@ router.post('/', async (req: Request, res: Response) => {
     // Validate request data
     const validation = validateSignedOrder(req.body);
     if (!validation.valid) {
+      logger.error('Order validation failed', { 
+        errors: validation.errors,
+        body: req.body 
+      });
       const response: ApiResponse<null> = {
         success: false,
         error: {
