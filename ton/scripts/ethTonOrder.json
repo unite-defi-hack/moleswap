@@ -1,0 +1,13 @@
+{
+    "maker_address": "0x1111111111111111111111111111111111111111",
+    "maker_asset": "0x2222222222222222222222222222222222222222",
+    "making_amount": 200000000,
+    "receiver_address": "0QAb-LcZH2MIPwHmQC3nb1lWNOms7OqJJGbXJpGEkwX-JXHz",
+    "taker_address": "0QAb-LcZH2MIPwHmQC3nb1lWNOms7OqJJGbXJpGEkwX-JXHz",
+    "taker_asset": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+    "taking_amount": 100000000,
+    "creation_time": "2025-07-28T00:00:00.000Z",
+    "expiration_time": "2025-07-31T00:00:00.000Z",
+    "order_hash": "0xd95c4e1266812c6dad3af0747e903362ea37418cb1f284e39b2b8cbcacb4eaf4",
+    "hashlock": "0xaf5c5c9212dcb3764446c2c5bf47a42ce183974b2d3a08022583aaa4ca125546"
+}
