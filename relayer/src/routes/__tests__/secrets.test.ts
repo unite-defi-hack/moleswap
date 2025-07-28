@@ -1,8 +1,16 @@
 import request from 'supertest';
-import { app } from '../../index';
+import { createApp } from '../../index';
 import { db } from '../../database/connection';
 
 describe('Secrets API', () => {
+  let app: any;
+
+  beforeAll(async () => {
+    // Initialize the app
+    const { app: createdApp } = createApp();
+    app = createdApp;
+  });
+
   afterEach(async () => {
     // Clean up test data after each test
     await db('orders').del();
@@ -13,7 +21,10 @@ describe('Secrets API', () => {
       const response = await request(app)
         .post('/api/secrets/invalid_hash')
         .send({
-          requester: '0x6423C4Ef791393D53fE3BA8bD8A5CA73bceEB646'
+          srcEscrowAddress: '0x1234567890123456789012345678901234567890',
+          dstEscrowAddress: '0x0987654321098765432109876543210987654321',
+          srcChainId: '1',
+          dstChainId: '137'
         })
         .expect(400);
 
@@ -22,17 +33,20 @@ describe('Secrets API', () => {
       expect(response.body.error.message).toContain('Invalid order hash format');
     });
 
-    it('should reject request with invalid requester address', async () => {
+    it('should reject request with invalid escrow address', async () => {
       const response = await request(app)
         .post('/api/secrets/0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef')
         .send({
-          requester: 'invalid_address'
+          srcEscrowAddress: 'invalid_address',
+          dstEscrowAddress: '0x0987654321098765432109876543210987654321',
+          srcChainId: '1',
+          dstChainId: '137'
         })
         .expect(400);
 
       expect(response.body.success).toBe(false);
-      expect(response.body.error.code).toBe('INVALID_ADDRESS');
-      expect(response.body.error.message).toContain('Invalid requester address');
+      expect(response.body.error.code).toBe('INVALID_SECRET_REQUEST');
+      expect(response.body.error.message).toContain('Invalid request data');
     });
 
     it('should reject request for non-existent order', async () => {
@@ -41,14 +55,16 @@ describe('Secrets API', () => {
       const response = await request(app)
         .post(`/api/secrets/${nonExistentHash}`)
         .send({
-          requester: '0x6423C4Ef791393D53fE3BA8bD8A5CA73bceEB646'
+          srcEscrowAddress: '0x1234567890123456789012345678901234567890',
+          dstEscrowAddress: '0x0987654321098765432109876543210987654321',
+          srcChainId: '1',
+          dstChainId: '137'
         })
         .expect(400);
 
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('INVALID_SECRET_REQUEST');
-      // The error message might be "Validation failed: Unknown error" due to database issues
-      expect(response.body.error.message).toMatch(/Order not found|Validation failed/);
+      expect(response.body.error.message).toContain('Order not found');
     });
   });
 }); 

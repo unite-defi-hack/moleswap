@@ -2,12 +2,18 @@
 process.env['NODE_ENV'] = 'test';
 
 import request from 'supertest';
-import { app } from '../../index';
+import { createApp } from '../../index';
 import { db, runMigrations } from '../../database/connection';
 import { ethers } from 'ethers';
 
 describe('Orders API - End to End Tests', () => {
+  let app: any;
+
   beforeAll(async () => {
+    // Initialize the app
+    const { app: createdApp } = createApp();
+    app = createdApp;
+    
     // Ensure database is set up for tests
     await runMigrations();
   });
