@@ -79,6 +79,48 @@ export class SrcEscrow implements Contract {
         });
     }
 
+    async sendWithdraw(
+        provider: ContractProvider,
+        via: Sender,
+        secret: bigint,
+        query_id: number = 0,
+        value: bigint = toNano('0.05'),
+    ) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(EscrowOp.withdraw, 32).storeUint(query_id, 64).storeUint(secret, 256).endCell(),
+        });
+    }
+
+    async sendWithdrawTo(
+        provider: ContractProvider,
+        via: Sender,
+        secret: bigint,
+        to: Address,
+        query_id: number = 0,
+        value: bigint = toNano('0.05'),
+    ) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(EscrowOp.withdraw_to, 32)
+                .storeUint(query_id, 64)
+                .storeUint(secret, 256)
+                .storeAddress(to)
+                .endCell(),
+        });
+    }
+
+    async sendCancel(provider: ContractProvider, via: Sender, query_id: number = 0, value: bigint = toNano('0.05')) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(EscrowOp.cancel, 32).storeUint(query_id, 64).endCell(),
+        });
+    }
+
     async getEscrowData(provider: ContractProvider) {
         const result = await provider.get('get_escrow_data', []);
         return {

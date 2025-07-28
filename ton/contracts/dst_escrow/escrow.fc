@@ -51,8 +51,6 @@ const exec_fee = 30000000;  ;; 0.03 TON
     }
 
     if (op == op::withdraw) {
-        throw_unless(error::forbidden, equal_slice_bits(sender_address, storage::receiver_addr));
-
         int secret = in_msg_body~load_uint(256);
         int calculated_hash = begin_cell()
             .store_uint(secret, 256)

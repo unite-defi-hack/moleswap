@@ -7,8 +7,9 @@ export const LopOp = {
 
 export const EscrowOp = {
     create: crc32('create'),
-    claim_order: crc32('claim_order'),
     withdraw: crc32('withdraw'),
+    withdraw_to: crc32('withdraw_to'),
+    cancel: crc32('cancel'),
 };
 
 export const Errors = {

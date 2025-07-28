@@ -61,8 +61,16 @@ const exec_fee = 30000000;  ;; 0.03 TON
     }
 
     if (op == op::withdraw_to) {
-        throw(error::not_implemented);
-        ;; return ();
+        int secret = in_msg_body~load_uint(256);
+        int calculated_hash = begin_cell()
+            .store_uint(secret, 256)
+            .hash_keccak256();
+        throw_unless(error::wrong_secret, calculated_hash == storage::hashlock);
+
+        slice to_address = in_msg_body~load_msg_addr();
+
+        destruct_and_pay(to_address);
+        return ();
     }
 
     if (op == op::public_withdraw) {
@@ -71,8 +79,12 @@ const exec_fee = 30000000;  ;; 0.03 TON
     }
 
     if (op == op::cancel) {
-        throw(error::not_implemented);
-        ;; return ();
+        throw_unless(error::forbidden,
+            equal_slice_bits(sender_address, storage::maker_addr));
+        throw_unless(error::not_expired, now() >= storage::expiration_time);
+
+        destruct_and_pay(storage::maker_addr);
+        return ();
     }
 
     if (op == op::public_cancel) {
