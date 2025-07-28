@@ -8,6 +8,7 @@ import { EscrowOp, LopOp } from '../wrappers/opcodes';
 import { generateRandomBigInt, ethAddressToBigInt, HOLE_ADDRESS } from '../wrappers/utils';
 import { OrderConfig } from '../wrappers/types';
 import { SrcEscrow } from '../wrappers/SrcEscrow';
+import { DstEscrow } from '../wrappers/DstEscrow';
 
 const HOUR = 1000 * 60 * 60;
 const DAY = 24 * HOUR;
@@ -22,6 +23,7 @@ describe('UserOrder', () => {
     let deployer: SandboxContract<TreasuryContract>;
     let maker: SandboxContract<TreasuryContract>;
     let taker: SandboxContract<TreasuryContract>;
+    let receiver: SandboxContract<TreasuryContract>;
     let lopSC: SandboxContract<LimitOrderProtocol>;
 
     beforeAll(async () => {
@@ -35,6 +37,7 @@ describe('UserOrder', () => {
         deployer = await blockchain.treasury('deployer');
         maker = await blockchain.treasury('maker');
         taker = await blockchain.treasury('taker');
+        receiver = await blockchain.treasury('receiver');
 
         lopSC = blockchain.openContract(
             LimitOrderProtocol.createFromConfig(
@@ -47,6 +50,20 @@ describe('UserOrder', () => {
             ),
         );
     });
+
+    async function createOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+        const result = await lopSC.sendCreateOrder(maker.getSender(), order);
+
+        expect(result.transactions).toHaveTransaction({
+            from: maker.address,
+            to: lopSC.address,
+            op: LopOp.create_order,
+            success: true,
+        });
+
+        const orderHash = LimitOrderProtocol.calculateOrderHash(order);
+        return { result, orderHash };
+    }
 
     it('create a new order successful', async () => {
         const secret = generateRandomBigInt();
@@ -63,19 +80,10 @@ describe('UserOrder', () => {
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
         };
 
-        const res = await lopSC.sendCreateOrder(maker.getSender(), order);
-
-        expect(res.transactions).toHaveTransaction({
-            from: maker.address,
-            to: lopSC.address,
-            op: LopOp.create_order,
-            success: true,
-        });
-
-        const orderHash = LimitOrderProtocol.calculateOrderHash(order);
+        const { result, orderHash } = await createOrder(order);
         const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
 
-        expect(res.transactions).toHaveTransaction({
+        expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: srcEscrowAddress,
             op: EscrowOp.create,
@@ -90,9 +98,57 @@ describe('UserOrder', () => {
         expect(orderData.expirationTime).toEqual(order.expiration_time);
         expect(orderData.makerAddress.toString()).toEqual(order.maker_address.toString());
         expect(orderData.makerAssetAddress.toString()).toEqual(order.maker_asset.toString());
-        // expect(orderData.makerAssetAmount).toEqual(order.making_amount);
-        // expect(orderData.receiverAddress).toEqual(order.receiver_address);
-        // expect(orderData.takerAssetAddress).toEqual(order.taker_asset);
-        // expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
+        expect(orderData.makerAssetAmount).toEqual(order.making_amount);
+        expect(orderData.receiverAddress).toEqual(order.receiver_address);
+        expect(orderData.takerAssetAddress).toEqual(order.taker_asset);
+        expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
+    });
+
+    it('taker should claim order successful', async () => {
+        const secret = generateRandomBigInt();
+        const order: OrderConfig = {
+            maker_address: ethAddressToBigInt('0x1111111111111111111111111111111111111111'),
+            maker_asset: ethAddressToBigInt('0x2222222222222222222222222222222222222222'),
+            making_amount: toNano(100),
+            receiver_address: receiver.address,
+            taker_address: taker.address,
+            taker_asset: HOLE_ADDRESS,
+            taking_amount: toNano(200),
+            order_hash: generateRandomBigInt(),
+            hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
+            creation_time: Math.floor(Date.now() / 1000),
+            expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+        };
+
+        const res = await lopSC.sendClaimOrder(taker.getSender(), order);
+
+        expect(res.transactions).toHaveTransaction({
+            from: taker.address,
+            to: lopSC.address,
+            op: LopOp.claim_order,
+            success: true,
+        });
+
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(order.order_hash!!);
+        expect(res.transactions).toHaveTransaction({
+            from: lopSC.address,
+            to: dstEscrowAddress,
+            op: EscrowOp.create,
+            success: true,
+        });
+
+        const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrowAddress));
+        const orderData = await dstEscrowSC.getEscrowData();
+        expect(orderData.orderHash).toEqual(order.order_hash!!);
+        expect(orderData.hashlock).toEqual(order.hashlock);
+        expect(orderData.creationTime).toEqual(order.creation_time);
+        expect(orderData.expirationTime).toEqual(order.expiration_time);
+        expect(orderData.makerAddress).toEqual(order.maker_address);
+        expect(orderData.makerAssetAddress).toEqual(order.maker_asset);
+        expect(orderData.makerAssetAmount).toEqual(order.making_amount);
+        expect(orderData.receiverAddress.toString()).toEqual(order.receiver_address.toString());
+        expect(orderData.takerAddress.toString()).toEqual(order.taker_address!!.toString());
+        expect(orderData.takerAssetAddress.toString()).toEqual(order.taker_asset.toString());
+        expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
     });
 });
