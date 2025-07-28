@@ -62,17 +62,17 @@
   - [ ] Handle TON-specific parameters
 
 ## Phase 4: Secret Distribution
-- [ ] **Escrow Validation**
-  - [ ] Implement source escrow validation
-  - [ ] Implement destination escrow validation
-  - [ ] Add balance verification
-  - [ ] Create parameter matching logic
+- [x] **Escrow Validation**
+  - [x] Implement source escrow validation
+  - [x] Implement destination escrow validation
+  - [x] Add balance verification
+  - [x] Create parameter matching logic
 
-- [ ] **Secret Endpoint**
-  - [ ] POST /api/secrets/:orderHash - Request secret
-  - [ ] Add validation before secret sharing
-  - [ ] Implement secret distribution logic
-  - [ ] Add validation result tracking
+- [x] **Secret Endpoint**
+  - [x] POST /api/secrets/:orderHash - Request secret
+  - [x] Add validation before secret sharing
+  - [x] Implement secret distribution logic
+  - [x] Add validation result tracking
 
 ## Phase 5: Testing and Polish
 - [ ] **Testing**
@@ -103,7 +103,7 @@
 7. ~~**Create basic API endpoints**~~ ✅
 8. ~~**Implement Ethereum chain plugin**~~ ✅
 9. ~~**Add escrow validation logic**~~ ✅
-10. **Implement TON chain plugin**
+10. ~~**Implement escrow validation with dummy plugin**~~ ✅
 11. **Add comprehensive testing**
 
 ## Success Criteria

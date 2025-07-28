@@ -244,11 +244,13 @@ export async function validateOrderForSecretSharing(orderHash: string): Promise<
       };
     }
     
-    // Check if secret already exists
-    if (order.secret) {
+    // Check if secret has already been shared (not just if it exists)
+    // For now, we'll allow sharing if the order is in active state, regardless of secret existence
+    // In a real implementation, you might want to track if the secret was actually shared
+    if (order.status === 'completed') {
       return {
         valid: false,
-        error: 'Secret has already been shared for this order'
+        error: 'Order has already been completed'
       };
     }
     

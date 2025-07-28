@@ -18,109 +18,111 @@ import {
 // Load environment variables
 dotenv.config();
 
-const app = express();
-const port = process.env['PORT'] || 3000;
+export function createApp() {
+  const app = express();
+  const port = process.env['PORT'] || 3000;
 
-// Export app for testing
-export { app };
+  // Initialize plugin system
+  const pluginFactory = new PluginFactoryImpl();
+  const pluginRegistry = new PluginRegistryImpl(pluginFactory);
 
-// Initialize plugin system
-const pluginFactory = new PluginFactoryImpl();
-const pluginRegistry = new PluginRegistryImpl(pluginFactory);
+  // Security middleware
+  app.use(helmet());
+  app.use(cors());
 
-// Security middleware
-app.use(helmet());
-app.use(cors());
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: parseInt(process.env['RATE_LIMIT_WINDOW_MS'] || '900000'), // 15 minutes
-  max: parseInt(process.env['RATE_LIMIT_MAX_REQUESTS'] || '100'), // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.',
-});
-app.use(limiter);
-
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// Request logging
-app.use((req, _res, next) => {
-  logger.info(`${req.method} ${req.path}`, {
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
+  // Rate limiting
+  const limiter = rateLimit({
+    windowMs: parseInt(process.env['RATE_LIMIT_WINDOW_MS'] || '900000'), // 15 minutes
+    max: parseInt(process.env['RATE_LIMIT_MAX_REQUESTS'] || '100'), // limit each IP to 100 requests per windowMs
+    message: 'Too many requests from this IP, please try again later.',
   });
-  next();
-});
+  app.use(limiter);
 
-// Health check endpoint
-app.get('/health', async (_req, res) => {
-  try {
-    const pluginStatuses = pluginRegistry.getAllPluginStatuses();
-    const healthyPlugins = pluginStatuses.filter(s => s.status === 'healthy').length;
-    const totalPlugins = pluginStatuses.length;
-    
-    res.json({ 
-      status: 'ok', 
-      timestamp: new Date().toISOString(),
-      plugins: {
-        total: totalPlugins,
-        healthy: healthyPlugins,
-        unhealthy: totalPlugins - healthyPlugins
-      }
+  // Body parsing middleware
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true }));
+
+  // Request logging
+  app.use((req, _res, next) => {
+    logger.info(`${req.method} ${req.path}`, {
+      ip: req.ip,
+      userAgent: req.get('User-Agent'),
     });
-  } catch (error) {
-    logger.error('Health check failed:', error);
-    res.status(500).json({ 
-      status: 'error', 
-      timestamp: new Date().toISOString(),
-      error: 'Health check failed'
-    });
-  }
-});
+    next();
+  });
 
-// Make plugin registry available to routes
-app.set('pluginRegistry', pluginRegistry);
+  // Health check endpoint
+  app.get('/health', async (_req, res) => {
+    try {
+      const pluginStatuses = pluginRegistry.getAllPluginStatuses();
+      const healthyPlugins = pluginStatuses.filter(s => s.status === 'healthy').length;
+      const totalPlugins = pluginStatuses.length;
+      
+      res.json({ 
+        status: 'ok', 
+        timestamp: new Date().toISOString(),
+        plugins: {
+          total: totalPlugins,
+          healthy: healthyPlugins,
+          unhealthy: totalPlugins - healthyPlugins
+        }
+      });
+    } catch (error) {
+      logger.error('Health check failed:', error);
+      res.status(500).json({ 
+        status: 'error', 
+        timestamp: new Date().toISOString(),
+        error: 'Health check failed'
+      });
+    }
+  });
 
-// API routes
-app.use('/api/orders', orderRoutes);
-app.use('/api/secrets', secretRoutes);
-app.use('/api/plugins', pluginRoutes);
+  // Make plugin registry available to routes
+  app.set('pluginRegistry', pluginRegistry);
 
-// Error handling middleware
-app.use(errorHandler);
+  // API routes
+  app.use('/api/orders', orderRoutes);
+  app.use('/api/secrets', secretRoutes);
+  app.use('/api/plugins', pluginRoutes);
 
-// 404 handler
-app.use('*', (_req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+  // Error handling middleware
+  app.use(errorHandler);
 
-async function startServer() {
-  try {
-    // Initialize database
-    await initializeDatabase();
-    logger.info('Database initialized successfully');
+  // 404 handler
+  app.use('*', (_req, res) => {
+    res.status(404).json({ error: 'Route not found' });
+  });
 
-    // Load and initialize plugins
-    const pluginConfigs = loadPluginConfig();
-    await pluginRegistry.loadPlugins(pluginConfigs);
-    logger.info('Plugins initialized successfully');
-
-    // Start server
-    app.listen(port, () => {
-      logger.info(`Server running on port ${port}`);
-      logger.info(`Environment: ${process.env['NODE_ENV']}`);
-      logger.info(`Loaded ${pluginRegistry.getAllPlugins().length} plugins`);
-    });
-  } catch (error) {
-    logger.error('Failed to start server:', error);
-    process.exit(1);
-  }
+  return { app, pluginRegistry, port };
 }
 
 // Only start server if not in test environment
 if (process.env['NODE_ENV'] !== 'test') {
-  startServer();
+  (async () => {
+    try {
+      // Initialize database
+      await initializeDatabase();
+      logger.info('Database initialized successfully');
+
+      // Create app and plugin registry
+      const { app, pluginRegistry, port } = createApp();
+
+      // Load and initialize plugins
+      const pluginConfigs = loadPluginConfig();
+      await pluginRegistry.loadPlugins(pluginConfigs);
+      logger.info('Plugins initialized successfully');
+
+      // Start server
+      app.listen(port, () => {
+        logger.info(`Server running on port ${port}`);
+        logger.info(`Environment: ${process.env['NODE_ENV']}`);
+        logger.info(`Loaded ${pluginRegistry.getAllPlugins().length} plugins`);
+      });
+    } catch (error) {
+      logger.error('Failed to start server:', error);
+      process.exit(1);
+    }
+  })();
 } else {
   // In test environment, just initialize the database without starting server
   initializeDatabase().catch((error) => {

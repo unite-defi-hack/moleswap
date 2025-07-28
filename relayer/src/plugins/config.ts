@@ -6,12 +6,35 @@ import { PluginConfig, ChainConfig } from '../types/plugins';
  */
 export function loadPluginConfig(): PluginConfig[] {
   const configs: PluginConfig[] = [];
-  
+
+  // If USE_DUMMY_PLUGIN is true, only load dummy plugins
+  if (process.env['USE_DUMMY_PLUGIN'] === 'true') {
+    const dummyChains = process.env['DUMMY_CHAINS'] || '1,137,56'; // Default to common chain IDs
+    const dummyChainIds = dummyChains.split(',').map(id => id.trim());
+    for (const chainId of dummyChainIds) {
+      configs.push({
+        type: 'dummy',
+        enabled: true,
+        config: {
+          rpcUrl: `https://dummy-${chainId}.example.com`,
+          chainId: chainId,
+          chainName: `Dummy Chain ${chainId}`,
+          escrowFactoryAddress: '0x0000000000000000000000000000000000000000',
+          blockTime: 12,
+          confirmations: 12,
+          timeout: 30000,
+          retries: 3
+        }
+      });
+      logger.info(`Loaded Dummy plugin config for chain ${chainId}`);
+    }
+    return configs;
+  }
+
   // Ethereum configuration
   const ethereumRpcUrl = process.env['ETHEREUM_RPC_URL'];
   const ethereumChainId = process.env['ETHEREUM_CHAIN_ID'] || '1';
   const ethereumEscrowFactory = process.env['ETHEREUM_ESCROW_FACTORY_ADDRESS'];
-  
   if (ethereumRpcUrl && ethereumEscrowFactory) {
     configs.push({
       type: 'ethereum',
@@ -33,7 +56,6 @@ export function loadPluginConfig(): PluginConfig[] {
   // TON configuration
   const tonRpcUrl = process.env['TON_RPC_URL'];
   const tonEscrowFactory = process.env['TON_ESCROW_FACTORY_ADDRESS'];
-  
   if (tonRpcUrl && tonEscrowFactory) {
     configs.push({
       type: 'ton',

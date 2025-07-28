@@ -4,18 +4,19 @@ import { createError } from '../middleware/errorHandler';
 import { 
   ApiResponse, 
   SecretRequestResponse, 
-  SecretRequestParams,
   OrderErrorCode 
 } from '../types/orders';
 import { 
   validateOrderForSecretSharing, 
-  storeOrderSecret 
+  getOrderSecret 
 } from '../database/orderService';
 import { 
-  generateSecretWithHashlock, 
   getEncryptionKey, 
-  verifySecretHashlock 
+  verifySecretHashlock, 
+  decryptSecret 
 } from '../utils/secretGeneration';
+import { EscrowValidationService } from '../services/escrowValidationService';
+import { validateSecretRequest } from '../types/validation';
 
 const router = Router();
 
@@ -23,12 +24,16 @@ const router = Router();
 router.post('/:orderHash', async (req: Request, res: Response) => {
   try {
     const { orderHash } = req.params;
-    const { requester, validationProof } = req.body as SecretRequestParams;
+    const requestData = req.body;
     
     logger.info('Requesting secret for order', { 
       orderHash, 
-      requester,
-      hasValidationProof: !!validationProof 
+      requestData: {
+        srcEscrowAddress: requestData.srcEscrowAddress,
+        dstEscrowAddress: requestData.dstEscrowAddress,
+        srcChainId: requestData.srcChainId,
+        dstChainId: requestData.dstChainId
+      }
     });
     
     // Validate order hash format
@@ -44,22 +49,30 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       return res.status(400).json(response);
     }
     
-    // Validate requester address
-    if (!requester || !requester.startsWith('0x') || requester.length !== 42) {
+    // Validate request body
+    const validation = validateSecretRequest(requestData);
+    if (!validation.valid) {
       const response: ApiResponse<null> = {
         success: false,
         error: {
-          code: OrderErrorCode.INVALID_ADDRESS,
-          message: 'Invalid requester address',
-          details: { requester }
+          code: OrderErrorCode.INVALID_SECRET_REQUEST,
+          message: 'Invalid request data',
+          details: { errors: validation.errors }
         }
       };
       return res.status(400).json(response);
     }
     
+    const { srcEscrowAddress, dstEscrowAddress, srcChainId, dstChainId } = validation.value!;
+    
     // Validate order for secret sharing
     const orderValidation = await validateOrderForSecretSharing(orderHash);
     if (!orderValidation.valid) {
+      logger.error('Order validation failed', { 
+        orderHash, 
+        error: orderValidation.error,
+        order: orderValidation.order 
+      });
       const response: ApiResponse<null> = {
         success: false,
         error: {
@@ -71,24 +84,98 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       return res.status(400).json(response);
     }
     
-    // TODO: Implement escrow validation logic here
-    // For now, we'll skip the validation and proceed with secret generation
-    // In a real implementation, you would validate that:
-    // 1. The requester has deposited funds in the source escrow
-    // 2. The destination escrow is ready to receive funds
-    // 3. All parameters match the order requirements
+    // Get plugin registry from app
+    const pluginRegistry = req.app.get('pluginRegistry');
+    if (!pluginRegistry) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.ESCROW_VALIDATION_FAILED,
+          message: 'Plugin system not available',
+          details: { orderHash }
+        }
+      };
+      return res.status(500).json(response);
+    }
     
-    // Generate new secret and hashlock
+    // Initialize escrow validation service
+    const escrowValidationService = new EscrowValidationService(pluginRegistry);
+    
+    // Check for existing validations first
+    const existingValidations = await escrowValidationService.checkExistingValidations(
+      orderHash,
+      srcEscrowAddress,
+      dstEscrowAddress
+    );
+    
+    let validationResult;
+    if (existingValidations) {
+      logger.info('Using existing escrow validations', { orderHash });
+      validationResult = existingValidations;
+    } else {
+      // Perform escrow validation
+      logger.info('Performing new escrow validation', { orderHash });
+      validationResult = await escrowValidationService.validateEscrows({
+        orderHash,
+        srcEscrowAddress,
+        dstEscrowAddress,
+        srcChainId,
+        dstChainId
+      });
+    }
+    
+    // Check if validation passed
+    if (!validationResult.allValid) {
+      // Return error response with validation result
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.ESCROW_VALIDATION_FAILED,
+          message: 'Escrow validation failed',
+          details: { 
+            orderHash,
+            validationResult: {
+              srcEscrow: {
+                ...validationResult.srcEscrow,
+                balance: validationResult.srcEscrow.balance?.toString()
+              },
+              dstEscrow: {
+                ...validationResult.dstEscrow,
+                balance: validationResult.dstEscrow.balance?.toString()
+              }
+            }
+          }
+        }
+      };
+      return res.status(400).json(response);
+    }
+    
+    // Get the stored secret for this order
+    const storedEncryptedSecret = await getOrderSecret(orderHash);
+    if (!storedEncryptedSecret) {
+      logger.error('No secret found for order', { orderHash });
+      
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.INVALID_SECRET_REQUEST,
+          message: 'No secret found for this order',
+          details: { orderHash }
+        }
+      };
+      return res.status(500).json(response);
+    }
+
+    // Decrypt the stored secret
     const encryptionKey = getEncryptionKey();
-    const { secret, hashlock, encryptedSecret } = generateSecretWithHashlock(encryptionKey);
+    const secret = decryptSecret(storedEncryptedSecret, encryptionKey);
     
-    // Verify the generated secret matches the order's hashlock
+    // Verify the secret matches the order's hashlock
     const order = orderValidation.order!;
     const secretValidation = verifySecretHashlock(secret, order.hashlock);
     if (!secretValidation.valid) {
-      logger.error('Generated secret does not match order hashlock', {
+      logger.error('Stored secret does not match order hashlock', {
         orderHash,
-        generatedHashlock: hashlock,
         orderHashlock: order.hashlock
       });
       
@@ -96,23 +183,7 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
         success: false,
         error: {
           code: OrderErrorCode.INVALID_SECRET_REQUEST,
-          message: 'Secret generation failed - hashlock mismatch',
-          details: { orderHash }
-        }
-      };
-      return res.status(500).json(response);
-    }
-    
-    // Store the encrypted secret in the database
-    const storageSuccess = await storeOrderSecret(orderHash, encryptedSecret);
-    if (!storageSuccess) {
-      logger.error('Failed to store secret in database', { orderHash });
-      
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: OrderErrorCode.INVALID_SECRET_REQUEST,
-          message: 'Failed to store secret',
+          message: 'Secret validation failed - hashlock mismatch',
           details: { orderHash }
         }
       };
@@ -125,13 +196,24 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       data: {
         secret,
         orderHash,
+        validationResult: {
+          srcEscrow: {
+            ...validationResult.srcEscrow,
+            balance: validationResult.srcEscrow.balance?.toString()
+          },
+          dstEscrow: {
+            ...validationResult.dstEscrow,
+            balance: validationResult.dstEscrow.balance?.toString()
+          }
+        },
         sharedAt: new Date()
       }
     };
     
     logger.info('Secret shared successfully', { 
       orderHash,
-      requester,
+      srcEscrowAddress,
+      dstEscrowAddress,
       secretPrefix: secret.slice(0, 10) + '...' // Log partial secret for security
     });
     

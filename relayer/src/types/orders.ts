@@ -213,6 +213,10 @@ export interface SecretRequestParams {
 export interface SecretRequestResponse {
   secret: string;
   orderHash: string;
+  validationResult?: {
+    srcEscrow: any;
+    dstEscrow: any;
+  };
   sharedAt: Date;
 }
 
