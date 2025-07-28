@@ -8,11 +8,14 @@
     "lint": "prettier --write 'scripts/**/*' && prettier --write 'tests/**/*' && prettier --write 'wrappers/**'"
   },
   "devDependencies": {
-    "@ton/blueprint": "^0.24.0",
-    "@ton/core": "^0.59.0",
+    "@tact-lang/compiler": "^1.6.13",
+    "@ton-community/func-js": "^0.10.0",
+    "@ton/blueprint": "^0.37.0",
+    "@ton/core": "^0.61.0",
     "@ton/crypto": "^3.3.0",
-    "@ton/sandbox": "^0.20.0",
-    "@ton/test-utils": "^0.4.2",
+    "@ton/sandbox": "^0.34.0",
+    "@ton/test-utils": "^0.7.0",
+    "@ton/tolk-js": "^1.0.0",
     "@ton/ton": "^15.0.0",
     "@types/crypto-js": "^4.2.2",
     "@types/jest": "^29.5.12",
