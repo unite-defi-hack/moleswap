@@ -45,7 +45,7 @@ const reserve_fee = 1000000;  ;; 0.001 TON
             begin_cell()
                 .store_slice(maker_address)
                 .store_slice(maker_asset)
-                .store_uint(making_amount, 128)
+                .store_coins(making_amount)
                 .store_uint(receiver_address, 256)
                 .end_cell()
         )
@@ -53,6 +53,54 @@ const reserve_fee = 1000000;  ;; 0.001 TON
             begin_cell()
                 .store_uint(taker_asset, 256)
                 .store_uint(taking_amount, 128)
+                .end_cell()
+        )
+        .end_cell();
+    send_message_with_stateinit(to_contract_address, msg_body, state_init, 0, CARRY_REMAINING_BALANCE);
+}
+
+() create_dst_escrow(
+    int maker_address,
+    int maker_asset,
+    int making_amount,
+    slice receiver_address,
+    slice taker_address,
+    slice taker_asset,
+    int taking_amount,
+    int order_hash,
+    int hashlock,
+    int creation_time,
+    int expiration_time,
+    int query_id
+) impure inline {
+    raw_reserve(reserve_fee, 4);
+
+    cell data = begin_cell()
+        .store_slice(my_address())
+        .store_uint(order_hash, 256)
+        .end_cell();
+    cell state_init = calculate_state_init(data, storage::dst_escrow_code);
+    slice to_contract_address = calculate_contract_address(state_init);
+
+    var msg_body = begin_cell()
+        .store_op(op::create)
+        .store_query_id(query_id)
+        .store_uint(hashlock, 256)
+        .store_uint(creation_time, 32)
+        .store_uint(expiration_time, 32)
+        .store_ref(
+            begin_cell()
+                .store_uint(maker_address, 256)
+                .store_uint(maker_asset, 256)
+                .store_uint(making_amount, 128)
+                .store_slice(receiver_address)
+                .end_cell()
+        )
+        .store_ref(
+            begin_cell()
+                .store_slice(taker_address)
+                .store_slice(taker_asset)
+                .store_coins(taking_amount)
                 .end_cell()
         )
         .end_cell();
@@ -157,6 +205,40 @@ const reserve_fee = 1000000;  ;; 0.001 TON
             query_id
         );
 
+        return ();
+    }
+
+    if (op == op::claim_order) {
+        int maker_address = in_msg_body~load_uint(256);
+        int maker_asset = in_msg_body~load_uint(256);
+        int making_amount = in_msg_body~load_uint(128);
+        slice receiver_address = in_msg_body~load_msg_addr();
+
+        slice ds_to = (in_msg_body~load_ref()).begin_parse();
+        slice taker_address = ds_to~load_msg_addr();
+        slice taker_asset = ds_to~load_msg_addr();
+        int taking_amount = ds_to~load_coins();
+
+        slice ds_auction = (in_msg_body~load_ref()).begin_parse();
+        int order_hash = ds_auction~load_uint(256);
+        int hashlock = ds_auction~load_uint(256);
+        int creation_time = ds_auction~load_uint(32);
+        int expiration_time = ds_auction~load_uint(32);
+
+        create_dst_escrow(
+            maker_address,
+            maker_asset,
+            making_amount,
+            receiver_address,
+            taker_address,
+            taker_asset,
+            taking_amount,
+            order_hash,
+            hashlock,
+            creation_time,
+            expiration_time,
+            query_id
+        );
         return ();
     }
 

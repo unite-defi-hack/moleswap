@@ -81,6 +81,42 @@ export class LimitOrderProtocol implements Contract {
         });
     }
 
+    async sendClaimOrder(
+        provider: ContractProvider,
+        via: Sender,
+        order: OrderConfig,
+        value: bigint = toNano(0.05),
+        queryId: number = 0,
+    ) {
+        return await provider.internal(via, {
+            value: value + order.making_amount,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(LopOp.claim_order, 32)
+                .storeUint(queryId, 64)
+                .storeUint(order.maker_address as bigint, 256)
+                .storeUint(order.maker_asset as bigint, 256)
+                .storeUint(order.making_amount, 128)
+                .storeAddress(order.receiver_address as Address)
+                .storeRef(
+                    beginCell()
+                        .storeAddress(order.taker_address as Address)
+                        .storeAddress(order.taker_asset as Address)
+                        .storeCoins(order.taking_amount)
+                        .endCell(),
+                )
+                .storeRef(
+                    beginCell()
+                        .storeUint(order.order_hash!!, 256)
+                        .storeUint(order.hashlock, 256)
+                        .storeUint(order.creation_time, 32)
+                        .storeUint(order.expiration_time, 32)
+                        .endCell(),
+                )
+                .endCell(),
+        });
+    }
+
     async getSrcEscrowAddress(provider: ContractProvider, orderHash: bigint) {
         const result = await provider.get('get_src_escrow_address', [
             {
