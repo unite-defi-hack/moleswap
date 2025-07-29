@@ -626,3 +626,6 @@ int equal_slices(slice a, slice b) asm "SDEQ";
 
 ;;; Concatenates two builders
 builder store_builder(builder to, builder from) asm "STBR";
+
+;;; Returns an empty slice
+slice empty_slice() asm "x{} PUSHSLICE";

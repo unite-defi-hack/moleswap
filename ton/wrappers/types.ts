@@ -14,3 +14,13 @@ export type OrderConfig = {
     taking_amount: bigint;
     salt?: bigint;
 };
+
+export type TimelocksConfig = {
+    srcWithdrawal: bigint;
+    srcPublicWithdrawal: bigint;
+    srcCancellation: bigint;
+    srcPublicCancellation: bigint;
+    dstWithdrawal: bigint;
+    dstPublicWithdrawal: bigint;
+    dstCancellation: bigint;
+};

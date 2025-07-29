@@ -26,6 +26,10 @@ describe('UserOrder', () => {
     let receiver: SandboxContract<TreasuryContract>;
     let lopSC: SandboxContract<LimitOrderProtocol>;
 
+    let secret: bigint;
+    let srcOrder: OrderConfig;
+    let dstOrder: OrderConfig;
+
     beforeAll(async () => {
         limitOrderProtocolCode = await compile('LimitOrderProtocol');
         srcEscrowCode = await compile('SrcEscrow');
@@ -39,16 +43,54 @@ describe('UserOrder', () => {
         taker = await blockchain.treasury('taker');
         receiver = await blockchain.treasury('receiver');
 
+        const timelocks = {
+            srcWithdrawal: 30n,
+            srcPublicWithdrawal: 350n,
+            srcCancellation: 500n,
+            srcPublicCancellation: 1000n,
+            dstWithdrawal: 50n,
+            dstPublicWithdrawal: 300n,
+            dstCancellation: 450n,
+        };
+
         lopSC = blockchain.openContract(
             LimitOrderProtocol.createFromConfig(
                 {
                     admin: deployer.address,
                     srcEscrowCode: srcEscrowCode,
                     dstEscrowCode: dstEscrowCode,
+                    timelocks,
                 },
                 limitOrderProtocolCode,
             ),
         );
+
+        secret = generateRandomBigInt();
+        srcOrder = {
+            maker_address: maker.address,
+            maker_asset: HOLE_ADDRESS,
+            making_amount: toNano(100),
+            receiver_address: ethAddressToBigInt('0x1111111111111111111111111111111111111111'),
+            taker_asset: ethAddressToBigInt('0x3333333333333333333333333333333333333333'),
+            taking_amount: toNano(200),
+            salt: generateRandomBigInt(),
+            hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
+            creation_time: Math.floor(Date.now() / 1000),
+            expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+        };
+        dstOrder = {
+            maker_address: ethAddressToBigInt('0x1111111111111111111111111111111111111111'),
+            maker_asset: ethAddressToBigInt('0x2222222222222222222222222222222222222222'),
+            making_amount: toNano(100),
+            receiver_address: receiver.address,
+            taker_address: taker.address,
+            taker_asset: HOLE_ADDRESS,
+            taking_amount: toNano(200),
+            order_hash: generateRandomBigInt(),
+            hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
+            creation_time: Math.floor(Date.now() / 1000),
+            expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+        };
     });
 
     async function createOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
@@ -66,21 +108,7 @@ describe('UserOrder', () => {
     }
 
     it('create a new order successful', async () => {
-        const secret = generateRandomBigInt();
-        const order: OrderConfig = {
-            maker_address: maker.address,
-            maker_asset: HOLE_ADDRESS,
-            making_amount: toNano(100),
-            receiver_address: ethAddressToBigInt('0x1111111111111111111111111111111111111111'),
-            taker_asset: ethAddressToBigInt('0x3333333333333333333333333333333333333333'),
-            taking_amount: toNano(200),
-            salt: generateRandomBigInt(),
-            hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
-            creation_time: Math.floor(Date.now() / 1000),
-            expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
-        };
-
-        const { result, orderHash } = await createOrder(order);
+        const { result, orderHash } = await createOrder(srcOrder);
         const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
 
         expect(result.transactions).toHaveTransaction({
@@ -93,43 +121,28 @@ describe('UserOrder', () => {
         const srcEscrowSC = blockchain.openContract(SrcEscrow.createFromAddress(srcEscrowAddress));
         const orderData = await srcEscrowSC.getEscrowData();
         expect(orderData.orderHash).toEqual(orderHash);
-        expect(orderData.hashlock).toEqual(order.hashlock);
-        expect(orderData.creationTime).toEqual(order.creation_time);
-        expect(orderData.expirationTime).toEqual(order.expiration_time);
-        expect(orderData.makerAddress.toString()).toEqual(order.maker_address.toString());
-        expect(orderData.makerAssetAddress.toString()).toEqual(order.maker_asset.toString());
-        expect(orderData.makerAssetAmount).toEqual(order.making_amount);
-        expect(orderData.receiverAddress).toEqual(order.receiver_address);
-        expect(orderData.takerAssetAddress).toEqual(order.taker_asset);
-        expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
+        expect(orderData.hashlock).toEqual(srcOrder.hashlock);
+        expect(orderData.creationTime).toEqual(srcOrder.creation_time);
+        expect(orderData.expirationTime).toEqual(srcOrder.expiration_time);
+        expect(orderData.makerAddress.toString()).toEqual(srcOrder.maker_address.toString());
+        expect(orderData.makerAssetAddress.toString()).toEqual(srcOrder.maker_asset.toString());
+        expect(orderData.makerAssetAmount).toEqual(srcOrder.making_amount);
+        expect(orderData.receiverAddress).toEqual(srcOrder.receiver_address);
+        expect(orderData.takerAssetAddress).toEqual(srcOrder.taker_asset);
+        expect(orderData.takerAssetAmount).toEqual(srcOrder.taking_amount);
     });
 
-    it('taker should claim order successful', async () => {
-        const secret = generateRandomBigInt();
-        const order: OrderConfig = {
-            maker_address: ethAddressToBigInt('0x1111111111111111111111111111111111111111'),
-            maker_asset: ethAddressToBigInt('0x2222222222222222222222222222222222222222'),
-            making_amount: toNano(100),
-            receiver_address: receiver.address,
-            taker_address: taker.address,
-            taker_asset: HOLE_ADDRESS,
-            taking_amount: toNano(200),
-            order_hash: generateRandomBigInt(),
-            hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
-            creation_time: Math.floor(Date.now() / 1000),
-            expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
-        };
-
-        const res = await lopSC.sendClaimOrder(taker.getSender(), order);
+    it('taker should fill order successful', async () => {
+        const res = await lopSC.sendFillOrder(taker.getSender(), dstOrder);
 
         expect(res.transactions).toHaveTransaction({
             from: taker.address,
             to: lopSC.address,
-            op: LopOp.claim_order,
+            op: LopOp.fill_order,
             success: true,
         });
 
-        const dstEscrowAddress = await lopSC.getDstEscrowAddress(order.order_hash!!);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(dstOrder.order_hash!!);
         expect(res.transactions).toHaveTransaction({
             from: lopSC.address,
             to: dstEscrowAddress,
@@ -139,16 +152,16 @@ describe('UserOrder', () => {
 
         const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrowAddress));
         const orderData = await dstEscrowSC.getEscrowData();
-        expect(orderData.orderHash).toEqual(order.order_hash!!);
-        expect(orderData.hashlock).toEqual(order.hashlock);
-        expect(orderData.creationTime).toEqual(order.creation_time);
-        expect(orderData.expirationTime).toEqual(order.expiration_time);
-        expect(orderData.makerAddress).toEqual(order.maker_address);
-        expect(orderData.makerAssetAddress).toEqual(order.maker_asset);
-        expect(orderData.makerAssetAmount).toEqual(order.making_amount);
-        expect(orderData.receiverAddress.toString()).toEqual(order.receiver_address.toString());
-        expect(orderData.takerAddress.toString()).toEqual(order.taker_address!!.toString());
-        expect(orderData.takerAssetAddress.toString()).toEqual(order.taker_asset.toString());
-        expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
+        expect(orderData.orderHash).toEqual(dstOrder.order_hash!!);
+        expect(orderData.hashlock).toEqual(dstOrder.hashlock);
+        expect(orderData.creationTime).toEqual(dstOrder.creation_time);
+        expect(orderData.expirationTime).toEqual(dstOrder.expiration_time);
+        expect(orderData.makerAddress).toEqual(dstOrder.maker_address);
+        expect(orderData.makerAssetAddress).toEqual(dstOrder.maker_asset);
+        expect(orderData.makerAssetAmount).toEqual(dstOrder.making_amount);
+        expect(orderData.receiverAddress.toString()).toEqual(dstOrder.receiver_address.toString());
+        expect(orderData.takerAddress.toString()).toEqual(dstOrder.taker_address!!.toString());
+        expect(orderData.takerAssetAddress.toString()).toEqual(dstOrder.taker_asset.toString());
+        expect(orderData.takerAssetAmount).toEqual(dstOrder.taking_amount);
     });
 });

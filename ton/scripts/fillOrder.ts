@@ -12,7 +12,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const lopAddress = await ui.input('Enter LOP address:');
     const lopSC = provider.open(LimitOrderProtocol.createFromAddress(Address.parse(lopAddress)));
 
-    const orderJsonPath = join(__dirname, 'ethTonOrder.json');
+    const orderJsonPath = join(__dirname, join('orders', 'ethTonOrder.json'));
     const order = parseOrder(orderJsonPath);
 
     await lopSC.sendClaimOrder(provider.sender(), order);

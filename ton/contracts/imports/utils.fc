@@ -2,6 +2,8 @@
 #include "errors.fc";
 #include "message.fc";
 
+const UINT32_MAX = 4294967295;
+
 int workchain() asm "0 PUSHINT";
 
 cell calculate_state_init(cell data, cell code) inline {
@@ -38,4 +40,11 @@ int is_resolvable?(slice addr) inline {
         .store_msgbody_prefix_slice()
         .end_cell();
     send_raw_message(msg, CARRY_REMAINING_BALANCE + SELFDESTRUCT_ON_EMPTY);
+}
+
+() validate_secret(int secret, int hashlock) impure inline {
+    int calculated_hash = begin_cell()
+            .store_uint(secret, 256)
+            .hash_keccak256();
+        throw_unless(error::wrong_secret, calculated_hash == hashlock);
 }

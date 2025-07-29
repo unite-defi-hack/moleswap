@@ -4,12 +4,28 @@ global slice storage::admin_address;
 global cell storage::src_escrow_code;
 global cell storage::dst_escrow_code;
 
+global int storage::src_withdrawal_timelock;
+global int storage::src_public_withdrawal_timelock;
+global int storage::src_cancellation_timelock;
+global int storage::src_public_cancellation_timelock;
+global int storage::dst_withdrawal_timelock;
+global int storage::dst_public_withdrawal_timelock;
+global int storage::dst_cancellation_timelock;
+
 
 () load_data() impure inline {
     slice ds = get_data().begin_parse();
     storage::admin_address = ds~load_msg_addr();
     storage::src_escrow_code = ds~load_ref();
     storage::dst_escrow_code = ds~load_ref();
+    ;; timelock periods for different phases
+    storage::src_withdrawal_timelock = ds~load_uint(32);
+    storage::src_public_withdrawal_timelock = ds~load_uint(32);
+    storage::src_cancellation_timelock = ds~load_uint(32);
+    storage::src_public_cancellation_timelock = ds~load_uint(32);
+    storage::dst_withdrawal_timelock = ds~load_uint(32);
+    storage::dst_public_withdrawal_timelock = ds~load_uint(32);
+    storage::dst_cancellation_timelock = ds~load_uint(32);
 }
 
 () save_data() impure inline {
@@ -17,6 +33,13 @@ global cell storage::dst_escrow_code;
         .store_slice(storage::admin_address)
         .store_ref(storage::src_escrow_code)
         .store_ref(storage::dst_escrow_code)
+        .store_uint(storage::src_withdrawal_timelock, 32)
+        .store_uint(storage::src_public_withdrawal_timelock, 32)
+        .store_uint(storage::src_cancellation_timelock, 32)
+        .store_uint(storage::src_public_cancellation_timelock, 32)
+        .store_uint(storage::dst_withdrawal_timelock, 32)
+        .store_uint(storage::dst_public_withdrawal_timelock, 32)
+        .store_uint(storage::dst_cancellation_timelock, 32)
         .end_cell()
     );
 }
