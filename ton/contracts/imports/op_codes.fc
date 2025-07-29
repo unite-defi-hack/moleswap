@@ -1,10 +1,11 @@
 
 ;; Limit order protocol
 const op::create_order = "create_order"c;
-const op::claim_order = "claim_order"c;
+const op::fill_order = "fill_order"c;
 
 ;; Escrow
 const op::create = "create"c;
+const op::claim = "claim"c;
 const op::withdraw = "withdraw"c;
 const op::withdraw_to = "withdraw_to"c;
 const op::public_withdraw = "public_withdraw"c;

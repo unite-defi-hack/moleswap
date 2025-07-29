@@ -10,19 +10,27 @@ import {
     toNano,
 } from '@ton/core';
 import { LopOp } from './opcodes';
-import { OrderConfig } from './types';
+import { OrderConfig, TimelocksConfig } from './types';
 
-export type EscrowFactoryConfig = {
+export type LimitOrderProtocolConfig = {
     admin: Address;
     srcEscrowCode: Cell;
     dstEscrowCode: Cell;
+    timelocks: TimelocksConfig;
 };
 
-export function escrowFactoryConfigToCell(config: EscrowFactoryConfig): Cell {
+export function limitOrderProtocolConfigToCell(config: LimitOrderProtocolConfig): Cell {
     return beginCell()
         .storeAddress(config.admin)
         .storeRef(config.srcEscrowCode)
         .storeRef(config.dstEscrowCode)
+        .storeUint(config.timelocks.srcWithdrawal, 32)
+        .storeUint(config.timelocks.srcPublicWithdrawal, 32)
+        .storeUint(config.timelocks.srcCancellation, 32)
+        .storeUint(config.timelocks.srcPublicCancellation, 32)
+        .storeUint(config.timelocks.dstWithdrawal, 32)
+        .storeUint(config.timelocks.dstPublicWithdrawal, 32)
+        .storeUint(config.timelocks.dstCancellation, 32)
         .endCell();
 }
 
@@ -36,8 +44,8 @@ export class LimitOrderProtocol implements Contract {
         return new LimitOrderProtocol(address);
     }
 
-    static createFromConfig(config: EscrowFactoryConfig, code: Cell, workchain = 0) {
-        const data = escrowFactoryConfigToCell(config);
+    static createFromConfig(config: LimitOrderProtocolConfig, code: Cell, workchain = 0) {
+        const data = limitOrderProtocolConfigToCell(config);
         const init = { code, data };
         return new LimitOrderProtocol(contractAddress(workchain, init), init);
     }
@@ -81,7 +89,7 @@ export class LimitOrderProtocol implements Contract {
         });
     }
 
-    async sendClaimOrder(
+    async sendFillOrder(
         provider: ContractProvider,
         via: Sender,
         order: OrderConfig,
@@ -89,10 +97,10 @@ export class LimitOrderProtocol implements Contract {
         queryId: number = 0,
     ) {
         return await provider.internal(via, {
-            value: value + order.making_amount,
+            value: value + order.taking_amount,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell()
-                .storeUint(LopOp.claim_order, 32)
+                .storeUint(LopOp.fill_order, 32)
                 .storeUint(queryId, 64)
                 .storeUint(order.maker_address as bigint, 256)
                 .storeUint(order.maker_asset as bigint, 256)

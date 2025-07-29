@@ -18,7 +18,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
     ui.write(`User secret: ${secret}`);
     ui.write(`Hash key: ${hashKey}`);
 
-    const orderJsonPath = join(__dirname, 'tonEthOrder.json');
+    const orderJsonPath = join(__dirname, join('orders', 'tonEthOrder.json'));
     const order = await parseOrder(orderJsonPath);
     order.hashlock = BigInt(hashKey);
 

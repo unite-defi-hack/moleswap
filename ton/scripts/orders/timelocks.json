@@ -1,0 +1,9 @@
+{
+    "srcWithdrawal": 36,
+    "srcPublicWithdrawal": 372,
+    "srcCancellation": 528,
+    "srcPublicCancellation": 648,
+    "dstWithdrawal": 60,
+    "dstPublicWithdrawal": 336,
+    "dstCancellation": 456
+}

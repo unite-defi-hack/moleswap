@@ -208,7 +208,7 @@ const reserve_fee = 1000000;  ;; 0.001 TON
         return ();
     }
 
-    if (op == op::claim_order) {
+    if (op == op::fill_order) {
         int maker_address = in_msg_body~load_uint(256);
         int maker_asset = in_msg_body~load_uint(256);
         int making_amount = in_msg_body~load_uint(128);
@@ -224,6 +224,8 @@ const reserve_fee = 1000000;  ;; 0.001 TON
         int hashlock = ds_auction~load_uint(256);
         int creation_time = ds_auction~load_uint(32);
         int expiration_time = ds_auction~load_uint(32);
+
+        throw_unless(error::not_enough_ton, msg_value > taking_amount + exec_fee);
 
         create_dst_escrow(
             maker_address,
