@@ -15,9 +15,9 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const orderJsonPath = join(__dirname, join('orders', 'ethTonOrder.json'));
     const order = parseOrder(orderJsonPath);
 
-    await lopSC.sendClaimOrder(provider.sender(), order);
+    await lopSC.sendFillOrder(provider.sender(), order);
 
-    ui.write('Order claim transaction was sent...');
+    ui.write('Order fill transaction was sent...');
 }
 
 function parseOrder(orderJsonPath: string): OrderConfig {
