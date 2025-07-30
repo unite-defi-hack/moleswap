@@ -1,0 +1,23 @@
+{
+  "name": "cross-chain-sdk-demo",
+  "version": "1.0.0",
+  "description": "Demo scripts for Moleswap cross-chain SDK usage",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsx 1_order_create.tsx",
+    "order:create": "tsx 1_order_create.tsx",
+    "order:deposit": "tsx 2_src_escrow.tsx",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["cross-chain", "1inch", "moleswap"],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.10.0",
+  "dependencies": {
+    "@1inch/cross-chain-sdk": "file:../../1inch-cross-chain-sdk",
+    "@1inch/limit-order-sdk": "^4.0.0",
+    "dotenv": "^17.2.1",
+    "ethers": "^6.15.0",
+    "tsx": "^4.19.2"
+  }
+}
