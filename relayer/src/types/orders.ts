@@ -1,15 +1,15 @@
 /**
- * Order interface based on Fusion protocol format with cross-chain support
+ * Real 1inch cross-chain SDK order format
  * This represents the core order structure that will be signed
  */
 export interface Order {
   maker: string;                    // Maker's address
-  srcAssetAddress: string;          // Source token address (e.g., USDC on Ethereum)
-  dstAssetAddress: string;          // Destination token address (e.g., USDT on TON)
+  makerAsset: string;               // Maker token address
+  takerAsset: string;               // Taker token address
   makerTraits: string;              // Hashlock (secret hash)
   salt: string;                     // Order uniqueness
-  srcAmount: string;                // Amount of source token
-  dstAmount: string;                // Amount of destination token
+  makingAmount: string;             // Amount of maker token
+  takingAmount: string;             // Amount of taker token
   receiver: string;                 // Receiver address (usually zero)
   
   // Cross-chain specific fields
@@ -55,10 +55,10 @@ export interface SignedOrder {
 export interface OrderDataRequest {
   order: {
     maker: string;
-    srcAssetAddress: string;
-    dstAssetAddress: string;
-    srcAmount: string;
-    dstAmount: string;
+    makerAsset: string;
+    takerAsset: string;
+    makingAmount: string;
+    takingAmount: string;
     receiver: string;
     
     // Cross-chain specific fields

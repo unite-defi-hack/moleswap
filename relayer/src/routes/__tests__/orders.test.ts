@@ -32,10 +32,10 @@ describe('Orders API', () => {
     const validOrderData = {
       order: {
         maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-        srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-        dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-        srcAmount: '1000000000000000000',
-        dstAmount: '2000000000000000000',
+        makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+        takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+        makingAmount: '1000000000000000000',
+        takingAmount: '2000000000000000000',
         receiver: '0x0000000000000000000000000000000000000000'
       }
     };
@@ -70,10 +70,10 @@ describe('Orders API', () => {
       // Validate order structure
       const order = response.body.data.orderToSign;
       expect(order.maker).toBe(validOrderData.order.maker);
-      expect(order.srcAssetAddress).toBe(validOrderData.order.srcAssetAddress);
-      expect(order.dstAssetAddress).toBe(validOrderData.order.dstAssetAddress);
-      expect(order.srcAmount).toBe(validOrderData.order.srcAmount);
-      expect(order.dstAmount).toBe(validOrderData.order.dstAmount);
+      expect(order.makerAsset).toBe(validOrderData.order.makerAsset);
+      expect(order.takerAsset).toBe(validOrderData.order.takerAsset);
+      expect(order.makingAmount).toBe(validOrderData.order.makingAmount);
+      expect(order.takingAmount).toBe(validOrderData.order.takingAmount);
       expect(order.receiver).toBe(validOrderData.order.receiver);
       
       // Validate generated fields
@@ -110,7 +110,7 @@ describe('Orders API', () => {
         ...validOrderData,
         order: {
           ...validOrderData.order,
-          srcAssetAddress: '0xinvalid'
+          makerAsset: '0xinvalid'
         }
       };
 
@@ -129,7 +129,7 @@ describe('Orders API', () => {
         ...validOrderData,
         order: {
           ...validOrderData.order,
-          srcAmount: '0'
+          makingAmount: '0'
         }
       };
 
@@ -148,7 +148,7 @@ describe('Orders API', () => {
         ...validOrderData,
         order: {
           ...validOrderData.order,
-          dstAmount: '0'
+          takingAmount: '0'
         }
       };
 
@@ -167,7 +167,7 @@ describe('Orders API', () => {
         ...validOrderData,
         order: {
           ...validOrderData.order,
-          dstAssetAddress: validOrderData.order.srcAssetAddress
+          takerAsset: validOrderData.order.makerAsset
         }
       };
 
@@ -185,7 +185,7 @@ describe('Orders API', () => {
       const invalidOrderData = {
         order: {
           maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-          // Missing srcAssetAddress, dstAssetAddress, srcAmount, dstAmount
+          // Missing makerAsset, takerAsset, makingAmount, takingAmount
         }
       };
 
@@ -203,10 +203,10 @@ describe('Orders API', () => {
       const orderDataWithoutReceiver = {
         order: {
           maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          srcAmount: '1000000000000000000',
-          dstAmount: '2000000000000000000'
+          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          makingAmount: '1000000000000000000',
+          takingAmount: '2000000000000000000'
           // receiver not provided
         }
       };
@@ -283,12 +283,12 @@ describe('Orders API', () => {
   describe('POST /api/orders', () => {
     const validOrder = {
       maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-      srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-      dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+      makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+      takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
       makerTraits: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
       salt: '8240221422984282745454410369971298296651574087129927646899272926690',
-      srcAmount: '1000000000000000000',
-      dstAmount: '2000000000000000000',
+      makingAmount: '1000000000000000000',
+      takingAmount: '2000000000000000000',
       receiver: '0x0000000000000000000000000000000000000000'
     };
     const validSignature = '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1b';

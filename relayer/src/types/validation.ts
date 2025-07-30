@@ -14,19 +14,19 @@ export const orderSchema = Joi.object({
       'string.pattern.base': 'Maker must be a valid Ethereum address',
       'any.required': 'Maker address is required'
     }),
-  srcAssetAddress: Joi.string()
+  makerAsset: Joi.string()
     .pattern(OrderValidationSchemas.asset)
     .required()
     .messages({
-      'string.pattern.base': 'Source asset must be a valid Ethereum address',
-      'any.required': 'Source asset is required'
+      'string.pattern.base': 'Maker asset must be a valid Ethereum address',
+      'any.required': 'Maker asset is required'
     }),
-  dstAssetAddress: Joi.string()
+  takerAsset: Joi.string()
     .pattern(OrderValidationSchemas.asset)
     .required()
     .messages({
-      'string.pattern.base': 'Destination asset must be a valid Ethereum address',
-      'any.required': 'Destination asset is required'
+      'string.pattern.base': 'Taker asset must be a valid Ethereum address',
+      'any.required': 'Taker asset is required'
     }),
   makerTraits: Joi.string()
     .pattern(OrderValidationSchemas.hashlock)
@@ -46,27 +46,27 @@ export const orderSchema = Joi.object({
       'string.max': 'Salt exceeds maximum length',
       'any.required': 'Salt is required'
     }),
-  srcAmount: Joi.string()
+  makingAmount: Joi.string()
     .pattern(OrderValidationSchemas.amount)
     .min(1)
     .max(78)
     .required()
     .messages({
-      'string.pattern.base': 'Source amount must be a valid number string',
-      'string.min': 'Source amount must be at least 1',
-      'string.max': 'Source amount exceeds maximum length',
-      'any.required': 'Source amount is required'
+      'string.pattern.base': 'Making amount must be a valid number string',
+      'string.min': 'Making amount must be at least 1',
+      'string.max': 'Making amount exceeds maximum length',
+      'any.required': 'Making amount is required'
     }),
-  dstAmount: Joi.string()
+  takingAmount: Joi.string()
     .pattern(OrderValidationSchemas.amount)
     .min(1)
     .max(78)
     .required()
     .messages({
-      'string.pattern.base': 'Destination amount must be a valid number string',
-      'string.min': 'Destination amount must be at least 1',
-      'string.max': 'Destination amount exceeds maximum length',
-      'any.required': 'Destination amount is required'
+      'string.pattern.base': 'Taking amount must be a valid number string',
+      'string.min': 'Taking amount must be at least 1',
+      'string.max': 'Taking amount exceeds maximum length',
+      'any.required': 'Taking amount is required'
     }),
   receiver: Joi.string()
     .pattern(OrderValidationSchemas.maker)
@@ -86,41 +86,41 @@ export const orderDataRequestSchema = Joi.object({
         'string.pattern.base': 'Maker must be a valid Ethereum address',
         'any.required': 'Maker address is required'
       }),
-    srcAssetAddress: Joi.string()
+    makerAsset: Joi.string()
       .pattern(OrderValidationSchemas.asset)
       .required()
       .messages({
-        'string.pattern.base': 'Source asset must be a valid Ethereum address',
-        'any.required': 'Source asset is required'
+        'string.pattern.base': 'Maker asset must be a valid Ethereum address',
+        'any.required': 'Maker asset is required'
       }),
-    dstAssetAddress: Joi.string()
+    takerAsset: Joi.string()
       .pattern(OrderValidationSchemas.asset)
       .required()
       .messages({
-        'string.pattern.base': 'Destination asset must be a valid Ethereum address',
-        'any.required': 'Destination asset is required'
+        'string.pattern.base': 'Taker asset must be a valid Ethereum address',
+        'any.required': 'Taker asset is required'
       }),
-    srcAmount: Joi.string()
+    makingAmount: Joi.string()
       .pattern(OrderValidationSchemas.amount)
       .min(1)
       .max(78)
       .required()
       .messages({
-        'string.pattern.base': 'Source amount must be a valid number string',
-        'string.min': 'Source amount must be at least 1',
-        'string.max': 'Source amount exceeds maximum length',
-        'any.required': 'Source amount is required'
+        'string.pattern.base': 'Making amount must be a valid number string',
+        'string.min': 'Making amount must be at least 1',
+        'string.max': 'Making amount exceeds maximum length',
+        'any.required': 'Making amount is required'
       }),
-    dstAmount: Joi.string()
+    takingAmount: Joi.string()
       .pattern(OrderValidationSchemas.amount)
       .min(1)
       .max(78)
       .required()
       .messages({
-        'string.pattern.base': 'Destination amount must be a valid number string',
-        'string.min': 'Destination amount must be at least 1',
-        'string.max': 'Destination amount exceeds maximum length',
-        'any.required': 'Destination amount is required'
+        'string.pattern.base': 'Taking amount must be a valid number string',
+        'string.min': 'Taking amount must be at least 1',
+        'string.max': 'Taking amount exceeds maximum length',
+        'any.required': 'Taking amount is required'
       }),
     receiver: Joi.string()
       .pattern(OrderValidationSchemas.maker)
@@ -295,32 +295,32 @@ export const orderStatusUpdateSchema = Joi.object({
  */
 
 // Validate that amounts are positive and within bounds
-export const validateAmounts = (srcAmount: string, dstAmount: string) => {
+export const validateAmounts = (makingAmount: string, takingAmount: string) => {
   const errors: string[] = [];
   
   try {
-    const srcBN = BigInt(srcAmount);
-    const dstBN = BigInt(dstAmount);
+    const makingBN = BigInt(makingAmount);
+    const takingBN = BigInt(takingAmount);
     const maxBN = BigInt(OrderConstants.MAX_MAKING_AMOUNT);
     
-    if (srcBN <= 0n) {
-      errors.push('Source amount must be greater than zero');
+    if (makingBN <= 0n) {
+      errors.push('Making amount must be greater than zero');
     }
     
-    if (dstBN <= 0n) {
-      errors.push('Destination amount must be greater than zero');
+    if (takingBN <= 0n) {
+      errors.push('Taking amount must be greater than zero');
     }
     
-    if (srcBN > maxBN) {
-      errors.push('Source amount exceeds maximum allowed value');
+    if (makingBN > maxBN) {
+      errors.push('Making amount exceeds maximum allowed value');
     }
     
-    if (dstBN > maxBN) {
-      errors.push('Destination amount exceeds maximum allowed value');
+    if (takingBN > maxBN) {
+      errors.push('Taking amount exceeds maximum allowed value');
     }
     
-    if (srcBN === dstBN) {
-      errors.push('Source and destination amounts cannot be equal');
+    if (makingBN === takingBN) {
+      errors.push('Making and taking amounts cannot be equal');
     }
     
   } catch (error) {
@@ -337,8 +337,8 @@ export const validateAmounts = (srcAmount: string, dstAmount: string) => {
 export const validateAddresses = (order: any) => {
   const errors: string[] = [];
   
-  if (order.srcAssetAddress === order.dstAssetAddress) {
-    errors.push('Source and destination assets cannot be the same');
+  if (order.makerAsset === order.takerAsset) {
+    errors.push('Maker and taker assets cannot be the same');
   }
   
   if (order.maker === order.receiver && order.receiver !== OrderConstants.DEFAULT_RECEIVER) {
@@ -398,8 +398,8 @@ export const validateOrderData = (data: any) => {
   
   // Additional custom validations
   const amountValidation = validateAmounts(
-    value.order.srcAmount,
-    value.order.dstAmount
+    value.order.makingAmount,
+    value.order.takingAmount
   );
   
   const addressValidation = validateAddresses(value.order);
@@ -432,8 +432,8 @@ export const validateSignedOrder = (data: any) => {
   
   // Additional custom validations
   const amountValidation = validateAmounts(
-    value.signedOrder.order.srcAmount,
-    value.signedOrder.order.dstAmount
+    value.signedOrder.order.makingAmount,
+    value.signedOrder.order.takingAmount
   );
   
   const addressValidation = validateAddresses(value.signedOrder.order);

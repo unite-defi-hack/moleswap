@@ -23,12 +23,12 @@ export const ORDER_DOMAIN: EIP712Domain = {
 export const ORDER_TYPES: EIP712Types = {
   Order: [
     { name: 'maker', type: 'address' },
-    { name: 'srcAssetAddress', type: 'address' },
-    { name: 'dstAssetAddress', type: 'address' },
+    { name: 'makerAsset', type: 'address' },
+    { name: 'takerAsset', type: 'address' },
     { name: 'makerTraits', type: 'bytes32' },
     { name: 'salt', type: 'uint256' },
-    { name: 'srcAmount', type: 'uint256' },
-    { name: 'dstAmount', type: 'uint256' },
+    { name: 'makingAmount', type: 'uint256' },
+    { name: 'takingAmount', type: 'uint256' },
     { name: 'receiver', type: 'address' }
   ]
 };
@@ -58,12 +58,12 @@ export function generateOrderHash(order: Order): OrderHashResult {
   const types: EIP712Types = {
     Order: [
       { name: 'maker', type: 'address' },
-      { name: 'srcAssetAddress', type: 'address' },
-      { name: 'dstAssetAddress', type: 'address' },
+      { name: 'makerAsset', type: 'address' },
+      { name: 'takerAsset', type: 'address' },
       { name: 'makerTraits', type: 'bytes32' },
       { name: 'salt', type: 'uint256' },
-      { name: 'srcAmount', type: 'uint256' },
-      { name: 'dstAmount', type: 'uint256' },
+      { name: 'makingAmount', type: 'uint256' },
+      { name: 'takingAmount', type: 'uint256' },
       { name: 'receiver', type: 'address' }
     ]
   };
@@ -71,12 +71,12 @@ export function generateOrderHash(order: Order): OrderHashResult {
   // Create the message to sign
   const message = {
     maker: order.maker,
-    srcAssetAddress: order.srcAssetAddress,
-    dstAssetAddress: order.dstAssetAddress,
+    makerAsset: order.makerAsset,
+    takerAsset: order.takerAsset,
     makerTraits: order.makerTraits,
     salt: order.salt,
-    srcAmount: order.srcAmount,
-    dstAmount: order.dstAmount,
+    makingAmount: order.makingAmount,
+    takingAmount: order.takingAmount,
     receiver: order.receiver
   };
 
@@ -187,34 +187,34 @@ export function validateOrderHash(orderHash: string): { valid: boolean; error?: 
 /**
  * Create order hash from components
  * @param maker - Maker address
- * @param srcAssetAddress - Source asset address
- * @param dstAssetAddress - Destination asset address
+ * @param makerAsset - Maker asset address
+ * @param takerAsset - Taker asset address
  * @param makerTraits - Hashlock (secret hash)
  * @param salt - Order salt
- * @param srcAmount - Source amount
- * @param dstAmount - Destination amount
+ * @param makingAmount - Making amount
+ * @param takingAmount - Taking amount
  * @param receiver - Receiver address
  * @param domain - Optional domain override
  * @returns Order hash result
  */
 export function createOrderHashFromComponents(
   maker: string,
-  srcAssetAddress: string,
-  dstAssetAddress: string,
+  makerAsset: string,
+  takerAsset: string,
   makerTraits: string,
   salt: string,
-  srcAmount: string,
-  dstAmount: string,
+  makingAmount: string,
+  takingAmount: string,
   receiver: string
 ): OrderHashResult {
   const order: Order = {
     maker,
-    srcAssetAddress,
-    dstAssetAddress,
+    makerAsset,
+    takerAsset,
     makerTraits,
     salt,
-    srcAmount,
-    dstAmount,
+    makingAmount,
+    takingAmount,
     receiver
   };
   
@@ -238,12 +238,12 @@ export function getDomainSeparator(domain: EIP712Domain): string {
 export function formatOrderForSigning(order: Order): string {
   return `Order:
   Maker: ${order.maker}
-  Source Asset: ${order.srcAssetAddress}
-  Destination Asset: ${order.dstAssetAddress}
+  Maker Asset: ${order.makerAsset}
+  Taker Asset: ${order.takerAsset}
   Maker Traits: ${order.makerTraits}
   Salt: ${order.salt}
-  Source Amount: ${order.srcAmount}
-  Destination Amount: ${order.dstAmount}
+  Making Amount: ${order.makingAmount}
+  Taking Amount: ${order.takingAmount}
   Receiver: ${order.receiver}`;
 }
 
@@ -257,23 +257,23 @@ export function validateOrder(order: Order): OrderValidationResult {
 
   // Required fields validation
   if (!order.maker) errors.push('Maker is required');
-  if (!order.srcAssetAddress) errors.push('Source asset address is required');
-  if (!order.dstAssetAddress) errors.push('Destination asset address is required');
+  if (!order.makerAsset) errors.push('Maker asset address is required');
+  if (!order.takerAsset) errors.push('Taker asset address is required');
   if (!order.makerTraits) errors.push('Maker traits (hashlock) is required');
   if (!order.salt) errors.push('Salt is required');
-  if (!order.srcAmount) errors.push('Source amount is required');
-  if (!order.dstAmount) errors.push('Destination amount is required');
+  if (!order.makingAmount) errors.push('Making amount is required');
+  if (!order.takingAmount) errors.push('Taking amount is required');
   if (!order.receiver) errors.push('Receiver is required');
 
   // Address validation
   if (order.maker && !ethers.isAddress(order.maker)) {
     errors.push('Maker must be a valid Ethereum address');
   }
-  if (order.srcAssetAddress && !ethers.isAddress(order.srcAssetAddress)) {
-    errors.push('Source asset address must be a valid Ethereum address');
+  if (order.makerAsset && !ethers.isAddress(order.makerAsset)) {
+    errors.push('Maker asset address must be a valid Ethereum address');
   }
-  if (order.dstAssetAddress && !ethers.isAddress(order.dstAssetAddress)) {
-    errors.push('Destination asset address must be a valid Ethereum address');
+  if (order.takerAsset && !ethers.isAddress(order.takerAsset)) {
+    errors.push('Taker asset address must be a valid Ethereum address');
   }
   if (order.receiver && !ethers.isAddress(order.receiver)) {
     errors.push('Receiver must be a valid Ethereum address');
@@ -281,16 +281,16 @@ export function validateOrder(order: Order): OrderValidationResult {
 
   // Amount validation
   try {
-    if (order.srcAmount) {
-      const srcAmount = ethers.getBigInt(order.srcAmount);
-      if (srcAmount <= 0n) {
-        errors.push('Source amount must be greater than 0');
+    if (order.makingAmount) {
+      const makingAmount = ethers.getBigInt(order.makingAmount);
+      if (makingAmount <= 0n) {
+        errors.push('Making amount must be greater than 0');
       }
     }
-    if (order.dstAmount) {
-      const dstAmount = ethers.getBigInt(order.dstAmount);
-      if (dstAmount <= 0n) {
-        errors.push('Destination amount must be greater than 0');
+    if (order.takingAmount) {
+      const takingAmount = ethers.getBigInt(order.takingAmount);
+      if (takingAmount <= 0n) {
+        errors.push('Taking amount must be greater than 0');
       }
     }
   } catch (error) {

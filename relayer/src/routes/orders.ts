@@ -69,10 +69,10 @@ router.post('/data', async (req: Request, res: Response) => {
     logger.info('Order data generated successfully', { 
       orderHash,
       maker: order.maker,
-      srcAssetAddress: order.srcAssetAddress,
-      dstAssetAddress: order.dstAssetAddress,
-      srcAmount: order.srcAmount,
-      dstAmount: order.dstAmount,
+      makerAsset: order.makerAsset,
+      takerAsset: order.takerAsset,
+      makingAmount: order.makingAmount,
+      takingAmount: order.takingAmount,
       hashlock: hashlock.slice(0, 10) + '...', // Log partial hashlock for security
       salt: salt.slice(0, 10) + '...' // Log partial salt for security
     });

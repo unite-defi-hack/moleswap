@@ -4,12 +4,12 @@ import { Order } from '../../types/orders';
 describe('Order Hashing', () => {
   const mockOrder: Order = {
     maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-    srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-    dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+    makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+    takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
     makerTraits: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
     salt: '8240221422984282745454410369971298296651574087129927646899272926690',
-    srcAmount: '1000000000000000000',
-    dstAmount: '2000000000000000000',
+    makingAmount: '1000000000000000000',
+    takingAmount: '2000000000000000000',
     receiver: '0x0000000000000000000000000000000000000000'
   };
 
@@ -75,11 +75,11 @@ describe('Order Hashing', () => {
     });
 
     it('should reject order with zero amounts', () => {
-      const invalidOrder = { ...mockOrder, srcAmount: '0' };
+      const invalidOrder = { ...mockOrder, makingAmount: '0' };
       const result = validateOrder(invalidOrder);
       
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('Source amount must be greater than 0');
+      expect(result.errors).toContain('Making amount must be greater than 0');
     });
 
     it('should reject order with missing fields', () => {

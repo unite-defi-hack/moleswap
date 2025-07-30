@@ -28,10 +28,10 @@ describe('Orders API - End to End Tests', () => {
       const validOrderData = {
         order: {
           maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          srcAmount: '1000000000000000000',
-          dstAmount: '2000000000000000000',
+          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          makingAmount: '1000000000000000000',
+          takingAmount: '2000000000000000000',
           receiver: '0x0000000000000000000000000000000000000000'
         }
       };
@@ -49,10 +49,10 @@ describe('Orders API - End to End Tests', () => {
       // Validate order structure
       const order = response.body.data.orderToSign;
       expect(order.maker).toBe(validOrderData.order.maker);
-      expect(order.srcAssetAddress).toBe(validOrderData.order.srcAssetAddress);
-      expect(order.dstAssetAddress).toBe(validOrderData.order.dstAssetAddress);
-      expect(order.srcAmount).toBe(validOrderData.order.srcAmount);
-      expect(order.dstAmount).toBe(validOrderData.order.dstAmount);
+      expect(order.makerAsset).toBe(validOrderData.order.makerAsset);
+      expect(order.takerAsset).toBe(validOrderData.order.takerAsset);
+      expect(order.makingAmount).toBe(validOrderData.order.makingAmount);
+      expect(order.takingAmount).toBe(validOrderData.order.takingAmount);
       expect(order.receiver).toBe(validOrderData.order.receiver);
       
       // Validate generated fields
@@ -77,10 +77,10 @@ describe('Orders API - End to End Tests', () => {
       const validOrderData = {
         order: {
           maker: wallet.address,
-          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          srcAmount: '1000000000000000000',
-          dstAmount: '2000000000000000000',
+          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          makingAmount: '1000000000000000000',
+          takingAmount: '2000000000000000000',
           receiver: '0x0000000000000000000000000000000000000000'
         }
       };
@@ -107,12 +107,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'srcAssetAddress', type: 'address' },
-          { name: 'dstAssetAddress', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'srcAmount', type: 'uint256' },
-          { name: 'dstAmount', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -148,10 +148,10 @@ describe('Orders API - End to End Tests', () => {
       const validOrderData = {
         order: {
           maker: wallet1.address,
-          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          srcAmount: '1000000000000000000',
-          dstAmount: '2000000000000000000',
+          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          makingAmount: '1000000000000000000',
+          takingAmount: '2000000000000000000',
           receiver: '0x0000000000000000000000000000000000000000'
         }
       };
@@ -176,12 +176,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'srcAssetAddress', type: 'address' },
-          { name: 'dstAssetAddress', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'srcAmount', type: 'uint256' },
-          { name: 'dstAmount', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -246,10 +246,10 @@ describe('Orders API - End to End Tests', () => {
       const validOrderData = {
         order: {
           maker: wallet.address,
-          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          srcAmount: '1000000000000000000',
-          dstAmount: '2000000000000000000',
+          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          makingAmount: '1000000000000000000',
+          takingAmount: '2000000000000000000',
           receiver: '0x0000000000000000000000000000000000000000'
         }
       };
@@ -298,12 +298,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'srcAssetAddress', type: 'address' },
-          { name: 'dstAssetAddress', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'srcAmount', type: 'uint256' },
-          { name: 'dstAmount', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -316,10 +316,10 @@ describe('Orders API - End to End Tests', () => {
         const validOrderData = {
           order: {
             maker: wallet.address,
-            srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-            dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-            srcAmount: '1000000000000000000',
-            dstAmount: '2000000000000000000',
+            makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+            takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+            makingAmount: '1000000000000000000',
+            takingAmount: '2000000000000000000',
             receiver: '0x0000000000000000000000000000000000000000'
           }
         };
@@ -415,7 +415,7 @@ describe('Orders API - End to End Tests', () => {
       
       // All returned orders should have the specified makerAsset
       response.body.data.orders.forEach((order: any) => {
-        expect(order.order.srcAssetAddress).toBe(makerAsset);
+        expect(order.order.makerAsset).toBe(makerAsset);
       });
     });
 
@@ -431,7 +431,7 @@ describe('Orders API - End to End Tests', () => {
       
       // All returned orders should have the specified takerAsset
       response.body.data.orders.forEach((order: any) => {
-        expect(order.order.dstAssetAddress).toBe(takerAsset);
+        expect(order.order.takerAsset).toBe(takerAsset);
       });
     });
 
@@ -462,8 +462,8 @@ describe('Orders API - End to End Tests', () => {
       // All returned orders should match all filters
       response.body.data.orders.forEach((order: any) => {
         expect(order.status).toBe('active');
-        expect(order.order.srcAssetAddress).toBe(makerAsset);
-        expect(order.order.dstAssetAddress).toBe(takerAsset);
+        expect(order.order.makerAsset).toBe(makerAsset);
+        expect(order.order.takerAsset).toBe(takerAsset);
       });
     });
 
@@ -489,10 +489,10 @@ describe('Orders API - End to End Tests', () => {
       const validOrderData = {
         order: {
           maker: wallet.address,
-          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          srcAmount: '1000000000000000000',
-          dstAmount: '2000000000000000000',
+          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          makingAmount: '1000000000000000000',
+          takingAmount: '2000000000000000000',
           receiver: '0x0000000000000000000000000000000000000000'
         }
       };
@@ -516,12 +516,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'srcAssetAddress', type: 'address' },
-          { name: 'dstAssetAddress', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'srcAmount', type: 'uint256' },
-          { name: 'dstAmount', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -605,10 +605,10 @@ describe('Orders API - End to End Tests', () => {
       const validOrderData = {
         order: {
           maker: wallet.address,
-          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          srcAmount: '1000000000000000000',
-          dstAmount: '2000000000000000000',
+          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          makingAmount: '1000000000000000000',
+          takingAmount: '2000000000000000000',
           receiver: '0x0000000000000000000000000000000000000000'
         }
       };
@@ -632,12 +632,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'srcAssetAddress', type: 'address' },
-          { name: 'dstAssetAddress', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'srcAmount', type: 'uint256' },
-          { name: 'dstAmount', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
@@ -670,10 +670,10 @@ describe('Orders API - End to End Tests', () => {
       const validOrderData = {
         order: {
           maker: wallet.address,
-          srcAssetAddress: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-          dstAssetAddress: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-          srcAmount: '1000000000000000000',
-          dstAmount: '2000000000000000000',
+          makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+          takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
+          makingAmount: '1000000000000000000',
+          takingAmount: '2000000000000000000',
           receiver: '0x0000000000000000000000000000000000000000'
         }
       };
@@ -698,12 +698,12 @@ describe('Orders API - End to End Tests', () => {
       const types = {
         Order: [
           { name: 'maker', type: 'address' },
-          { name: 'srcAssetAddress', type: 'address' },
-          { name: 'dstAssetAddress', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
           { name: 'makerTraits', type: 'bytes32' },
           { name: 'salt', type: 'uint256' },
-          { name: 'srcAmount', type: 'uint256' },
-          { name: 'dstAmount', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
           { name: 'receiver', type: 'address' }
         ]
       };
