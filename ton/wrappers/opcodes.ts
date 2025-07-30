@@ -7,12 +7,21 @@ export const LopOp = {
 
 export const EscrowOp = {
     create: crc32('create'),
+    claim: crc32('claim'),
     withdraw: crc32('withdraw'),
     withdraw_to: crc32('withdraw_to'),
+    public_withdraw: crc32('public_withdraw'),
     cancel: crc32('cancel'),
+    public_cancel: crc32('public_cancel'),
 };
 
 export const Errors = {
+    not_enough_ton: 400,
+    not_enough_asset: 401,
     forbidden: 403,
+    wrong_workchain: 405,
+    already_claimed: 406,
     wrong_secret: 407,
+    expired: 408,
+    not_implemented: 501,
 };

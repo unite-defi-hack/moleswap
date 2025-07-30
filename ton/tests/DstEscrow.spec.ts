@@ -37,13 +37,13 @@ describe('DstEscrow', () => {
         receiver = await blockchain.treasury('receiver');
 
         timelocks = {
-            srcWithdrawal: 30n,
-            srcPublicWithdrawal: 350n,
-            srcCancellation: 500n,
-            srcPublicCancellation: 1000n,
-            dstWithdrawal: 50n,
-            dstPublicWithdrawal: 300n,
-            dstCancellation: 450n,
+            srcWithdrawal: 30,
+            srcPublicWithdrawal: 350,
+            srcCancellation: 500,
+            srcPublicCancellation: 1000,
+            dstWithdrawal: 50,
+            dstPublicWithdrawal: 300,
+            dstCancellation: 450,
         };
 
         secret = generateRandomBigInt();

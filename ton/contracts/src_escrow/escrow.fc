@@ -53,13 +53,15 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         storage::taker_asset_amount = taker_cs~load_uint(128);
         storage::taker_src_addr = empty_slice(); ;; will be set when taker call claim operation
 
+        throw_unless(error::expired, now() < storage::expiration_time);
+
         save_data();
         return ();
     }
 
     if (op == op::claim) {
         throw_unless(error::not_enough_ton, msg_value > min_security_deposit + exec_fee);
-        throw_unless(error::not_expired, now() < storage::expiration_time);
+        throw_unless(error::expired, now() < storage::expiration_time);
 
         storage::taker_src_addr = sender_address;
         storage::execution_start_time = now();
@@ -68,6 +70,13 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     }
 
     if (op == op::withdraw) {
+        throw_unless(error::forbidden,
+            equal_slice_bits(sender_address, storage::taker_src_addr));
+        throw_unless(error::withdraw_timelock_not_passed,
+            now() >= storage::execution_start_time + storage::withdrawal_timelock);
+        throw_unless(error::cancelation_phase_started,
+            now() < storage::execution_start_time + storage::cancellation_timelock);
+
         int secret = in_msg_body~load_uint(256);
         validate_secret(secret, storage::hashlock);
 
@@ -76,6 +85,13 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     }
 
     if (op == op::withdraw_to) {
+        throw_unless(error::forbidden,
+            equal_slice_bits(sender_address, storage::taker_src_addr));
+        throw_unless(error::withdraw_timelock_not_passed,
+            now() >= storage::execution_start_time + storage::withdrawal_timelock);
+        throw_unless(error::cancelation_phase_started,
+            now() < storage::execution_start_time + storage::cancellation_timelock);
+
         int secret = in_msg_body~load_uint(256);
         validate_secret(secret, storage::hashlock);
 
@@ -85,27 +101,44 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     }
 
     if (op == op::public_withdraw) {
-        throw(error::not_implemented);
-        ;; return ();
+        ;; ideally this should be allowed for token holders only
+        throw_unless(error::public_withdraw_timelock_not_passed,
+            now() >= storage::execution_start_time + storage::public_withdrawal_timelock);
+        throw_unless(error::cancelation_phase_started,
+            now() < storage::execution_start_time + storage::cancellation_timelock);
+
+        int secret = in_msg_body~load_uint(256);
+        validate_secret(secret, storage::hashlock);
+
+        send_ton(storage::taker_src_addr, storage::maker_asset_amount);
+        destruct_and_pay(sender_address);
+        return ();
     }
 
     if (op == op::cancel) {
-        throw_unless(error::forbidden,
-            equal_slice_bits(sender_address, storage::maker_addr));
-        throw_unless(error::not_expired, now() >= storage::expiration_time);
+        ;; maker should be able to cancel own order at any time
+        if (equal_slice_bits(sender_address, storage::maker_addr)) {
+            destruct_and_pay(storage::maker_addr);
+            return ();
+        }
 
-        destruct_and_pay(storage::maker_addr);
+        throw_unless(error::forbidden,
+            equal_slice_bits(sender_address, storage::taker_src_addr));
+        throw_unless(error::cancelation_phase_not_started,
+            now() >= storage::execution_start_time + storage::cancellation_timelock);
+
+        destruct_and_pay(storage::taker_src_addr);
         return ();
     }
 
     if (op == op::public_cancel) {
-        throw(error::not_implemented);
-        ;; return ();
-    }
+        ;; ideally this should be allowed for token holders only
+        throw_unless(error::cancelation_phase_not_started,
+            now() >= storage::execution_start_time + storage::public_cancellation_timelock);
 
-    if (op == op::rescue_funds) {
-        throw(error::not_implemented);
-        ;; return ();
+        send_ton(storage::maker_addr, storage::maker_asset_amount);
+        destruct_and_pay(sender_address);
+        return ();
     }
 
     throw(0xffff);
