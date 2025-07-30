@@ -84,12 +84,20 @@ export class SrcEscrow implements Contract {
         });
     }
 
+    async sendClaim(provider: ContractProvider, via: Sender, value: bigint = toNano('0.15'), query_id: number = 0) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(EscrowOp.claim, 32).storeUint(query_id, 64).endCell(),
+        });
+    }
+
     async sendWithdraw(
         provider: ContractProvider,
         via: Sender,
         secret: bigint,
-        query_id: number = 0,
         value: bigint = toNano('0.05'),
+        query_id: number = 0,
     ) {
         await provider.internal(via, {
             value,
@@ -103,8 +111,8 @@ export class SrcEscrow implements Contract {
         via: Sender,
         secret: bigint,
         to: Address,
-        query_id: number = 0,
         value: bigint = toNano('0.05'),
+        query_id: number = 0,
     ) {
         await provider.internal(via, {
             value,
@@ -118,11 +126,42 @@ export class SrcEscrow implements Contract {
         });
     }
 
-    async sendCancel(provider: ContractProvider, via: Sender, query_id: number = 0, value: bigint = toNano('0.05')) {
+    async sendPublicWithdraw(
+        provider: ContractProvider,
+        via: Sender,
+        secret: bigint,
+        value: bigint = toNano('0.05'),
+        query_id: number = 0,
+    ) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell()
+                .storeUint(EscrowOp.public_withdraw, 32)
+                .storeUint(query_id, 64)
+                .storeUint(secret, 256)
+                .endCell(),
+        });
+    }
+
+    async sendCancel(provider: ContractProvider, via: Sender, value: bigint = toNano('0.05'), query_id: number = 0) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
             body: beginCell().storeUint(EscrowOp.cancel, 32).storeUint(query_id, 64).endCell(),
+        });
+    }
+
+    async sendPublicCancel(
+        provider: ContractProvider,
+        via: Sender,
+        value: bigint = toNano('0.05'),
+        query_id: number = 0,
+    ) {
+        await provider.internal(via, {
+            value,
+            sendMode: SendMode.PAY_GAS_SEPARATELY,
+            body: beginCell().storeUint(EscrowOp.public_cancel, 32).storeUint(query_id, 64).endCell(),
         });
     }
 
@@ -162,5 +201,17 @@ export class SrcEscrow implements Contract {
             },
         ]);
         return res.stack.readBigNumber();
+    }
+
+    async getExecutionParams(provider: ContractProvider) {
+        const res = await provider.get('get_execution_params', []);
+        return {
+            executionStartTime: res.stack.readNumber(),
+            withdrawalTimelock: res.stack.readNumber(),
+            publicWithdrawalTimelock: res.stack.readNumber(),
+            cancellationTimelock: res.stack.readNumber(),
+            publicCancellationTimelock: res.stack.readNumber(),
+            takerSrcAddress: res.stack.readAddress(),
+        };
     }
 }

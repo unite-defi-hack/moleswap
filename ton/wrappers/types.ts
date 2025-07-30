@@ -16,11 +16,11 @@ export type OrderConfig = {
 };
 
 export type TimelocksConfig = {
-    srcWithdrawal: bigint;
-    srcPublicWithdrawal: bigint;
-    srcCancellation: bigint;
-    srcPublicCancellation: bigint;
-    dstWithdrawal: bigint;
-    dstPublicWithdrawal: bigint;
-    dstCancellation: bigint;
+    srcWithdrawal: number;
+    srcPublicWithdrawal: number;
+    srcCancellation: number;
+    srcPublicCancellation: number;
+    dstWithdrawal: number;
+    dstPublicWithdrawal: number;
+    dstCancellation: number;
 };

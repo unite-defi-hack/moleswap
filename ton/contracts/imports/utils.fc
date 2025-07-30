@@ -32,6 +32,16 @@ int is_resolvable?(slice addr) inline {
     throw_unless(error::wrong_workchain, is_resolvable?(addr));
 }
 
+() send_ton(slice to_address, int value) impure {
+    cell msg = begin_cell()
+        .store_msg_flag(msg_flag::bounceable)
+        .store_slice(to_address)
+        .store_coins(value)
+        .store_msgbody_prefix_slice()
+        .end_cell();
+    send_raw_message(msg, PAY_FEES_SEPARATELY);
+}
+
 () destruct_and_pay(slice to_address) impure {
     cell msg = begin_cell()
         .store_msg_flag(msg_flag::bounceable)

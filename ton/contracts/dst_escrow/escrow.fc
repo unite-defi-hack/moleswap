@@ -51,6 +51,9 @@ const exec_fee = 30000000;  ;; 0.03 TON
         storage::taker_asset_addr = taker_cs~load_msg_addr();
         storage::taker_asset_amount = taker_cs~load_coins();
 
+        throw_unless(error::expired, now() < storage::expiration_time);
+        throw_unless(error::not_ready, now() >= storage::creation_time);
+
         save_data();
         return ();
     }

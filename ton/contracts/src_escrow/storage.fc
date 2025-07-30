@@ -63,11 +63,11 @@ global int storage::public_cancellation_timelock;
         .store_uint(storage::creation_time, 32)
         .store_uint(storage::expiration_time, 32)
 
+        .store_uint(storage::execution_start_time, 32)
         .store_uint(storage::withdrawal_timelock, 32)
         .store_uint(storage::public_withdrawal_timelock, 32)
         .store_uint(storage::cancellation_timelock, 32)
         .store_uint(storage::public_cancellation_timelock, 32)
-        .store_uint(storage::execution_start_time, 32)
 
         .store_ref(begin_cell()
                     .store_slice(storage::maker_addr)

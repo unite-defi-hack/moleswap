@@ -32,12 +32,12 @@ function parseTimelocks(timelocksJsonPath: string): TimelocksConfig {
     const data = JSON.parse(readFileSync(timelocksJsonPath, 'utf-8'));
 
     return {
-        srcWithdrawal: BigInt(data.srcWithdrawal),
-        srcPublicWithdrawal: BigInt(data.srcPublicWithdrawal),
-        srcCancellation: BigInt(data.srcCancellation),
-        srcPublicCancellation: BigInt(data.srcPublicCancellation),
-        dstWithdrawal: BigInt(data.dstWithdrawal),
-        dstPublicWithdrawal: BigInt(data.dstPublicWithdrawal),
-        dstCancellation: BigInt(data.dstCancellation),
+        srcWithdrawal: Number(data.srcWithdrawal),
+        srcPublicWithdrawal: Number(data.srcPublicWithdrawal),
+        srcCancellation: Number(data.srcCancellation),
+        srcPublicCancellation: Number(data.srcPublicCancellation),
+        dstWithdrawal: Number(data.dstWithdrawal),
+        dstPublicWithdrawal: Number(data.dstPublicWithdrawal),
+        dstCancellation: Number(data.dstCancellation),
     };
 }
