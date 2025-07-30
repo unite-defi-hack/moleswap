@@ -5,7 +5,7 @@ import { compile } from '@ton/blueprint';
 import { SrcEscrow } from '../wrappers/SrcEscrow';
 import { Errors, EscrowOp } from '../wrappers/opcodes';
 import { ethAddressToBigInt, generateRandomBigInt, HOLE_ADDRESS } from '../wrappers/utils';
-import { OrderConfig } from '../wrappers/types';
+import { OrderConfig, TimelocksConfig } from '../wrappers/types';
 import { ethers } from 'ethers';
 
 const HOUR = 1000 * 60 * 60;
@@ -23,6 +23,7 @@ describe('SrcEscrow', () => {
 
     let secret: bigint;
     let order: OrderConfig;
+    let timelocks: TimelocksConfig;
 
     beforeAll(async () => {
         srcEscrowCode = await compile('SrcEscrow');
@@ -34,6 +35,16 @@ describe('SrcEscrow', () => {
         maker = await blockchain.treasury('maker');
         taker = await blockchain.treasury('taker');
         receiver = await blockchain.treasury('receiver');
+
+        timelocks = {
+            srcWithdrawal: 30n,
+            srcPublicWithdrawal: 350n,
+            srcCancellation: 500n,
+            srcPublicCancellation: 1000n,
+            dstWithdrawal: 50n,
+            dstPublicWithdrawal: 300n,
+            dstCancellation: 450n,
+        };
 
         secret = generateRandomBigInt();
         order = {
@@ -74,7 +85,7 @@ describe('SrcEscrow', () => {
         });
 
         // create
-        result = await srcEscrow.sendCreate(deployer.getSender(), order, 0, order.making_amount);
+        result = await srcEscrow.sendCreate(deployer.getSender(), order, timelocks, order.making_amount + toNano(0.05));
         expect(result.transactions).toHaveTransaction({
             from: deployer.address,
             to: srcEscrow.address,

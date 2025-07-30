@@ -41,6 +41,10 @@ const reserve_fee = 1000000;  ;; 0.001 TON
         .store_uint(hashlock, 256)
         .store_uint(creation_time, 32)
         .store_uint(expiration_time, 32)
+        .store_uint(storage::src_withdrawal_timelock, 32)
+        .store_uint(storage::src_public_withdrawal_timelock, 32)
+        .store_uint(storage::src_cancellation_timelock, 32)
+        .store_uint(storage::src_public_cancellation_timelock, 32)
         .store_ref(
             begin_cell()
                 .store_slice(maker_address)
@@ -88,6 +92,9 @@ const reserve_fee = 1000000;  ;; 0.001 TON
         .store_uint(hashlock, 256)
         .store_uint(creation_time, 32)
         .store_uint(expiration_time, 32)
+        .store_uint(storage::dst_withdrawal_timelock, 32)
+        .store_uint(storage::dst_public_withdrawal_timelock, 32)
+        .store_uint(storage::dst_cancellation_timelock, 32)
         .store_ref(
             begin_cell()
                 .store_uint(maker_address, 256)

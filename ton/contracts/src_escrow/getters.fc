@@ -19,6 +19,19 @@
     );
 }
 
+(int, int, int, int, int, slice) get_execution_params() method_id {
+    load_data();
+
+    return (
+        storage::execution_start_time,
+        storage::withdrawal_timelock,
+        storage::public_withdrawal_timelock,
+        storage::cancellation_timelock,
+        storage::public_cancellation_timelock,
+        storage::taker_src_addr
+    );
+}
+
 (int) get_secret_valid(int secret) method_id {
     load_data();
 

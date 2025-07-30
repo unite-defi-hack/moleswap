@@ -5,7 +5,7 @@ import { compile } from '@ton/blueprint';
 import { DstEscrow } from '../wrappers/DstEscrow';
 import { Errors, EscrowOp } from '../wrappers/opcodes';
 import { ethAddressToBigInt, generateRandomBigInt, HOLE_ADDRESS } from '../wrappers/utils';
-import { OrderConfig } from '../wrappers/types';
+import { OrderConfig, TimelocksConfig } from '../wrappers/types';
 import { ethers } from 'ethers';
 
 const HOUR = 1000 * 60 * 60;
@@ -23,6 +23,7 @@ describe('DstEscrow', () => {
 
     let secret: bigint;
     let order: OrderConfig;
+    let timelocks: TimelocksConfig;
 
     beforeAll(async () => {
         dstEscrowCode = await compile('DstEscrow');
@@ -34,6 +35,16 @@ describe('DstEscrow', () => {
         maker = await blockchain.treasury('maker');
         taker = await blockchain.treasury('taker');
         receiver = await blockchain.treasury('receiver');
+
+        timelocks = {
+            srcWithdrawal: 30n,
+            srcPublicWithdrawal: 350n,
+            srcCancellation: 500n,
+            srcPublicCancellation: 1000n,
+            dstWithdrawal: 50n,
+            dstPublicWithdrawal: 300n,
+            dstCancellation: 450n,
+        };
 
         secret = generateRandomBigInt();
         order = {
@@ -53,6 +64,7 @@ describe('DstEscrow', () => {
 
     async function createDstEscrow(
         order: OrderConfig,
+        timelocks: TimelocksConfig,
     ): Promise<{ result: any; dstEscrow: SandboxContract<DstEscrow> }> {
         const dstEscrow = blockchain.openContract(
             DstEscrow.createFromConfig(
@@ -74,7 +86,7 @@ describe('DstEscrow', () => {
         });
 
         // create
-        result = await dstEscrow.sendCreate(deployer.getSender(), order, 0, order.taking_amount);
+        result = await dstEscrow.sendCreate(deployer.getSender(), order, timelocks, order.taking_amount + toNano(0.05));
         expect(result.transactions).toHaveTransaction({
             from: deployer.address,
             to: dstEscrow.address,
@@ -86,7 +98,7 @@ describe('DstEscrow', () => {
     }
 
     it('create a new dst escrow successful', async () => {
-        const { dstEscrow } = await createDstEscrow(order);
+        const { dstEscrow } = await createDstEscrow(order, timelocks);
 
         const escrowData = await dstEscrow.getEscrowData();
         expect(escrowData.orderHash).toEqual(order.order_hash);
@@ -103,7 +115,7 @@ describe('DstEscrow', () => {
     });
 
     it('maker should withdraw ton from dst escrow successful when know the secret', async () => {
-        const { dstEscrow } = await createDstEscrow(order);
+        const { dstEscrow } = await createDstEscrow(order, timelocks);
         const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrow.address));
         const receiverBalanceBefore = await receiver.getBalance();
 
@@ -126,7 +138,7 @@ describe('DstEscrow', () => {
 
     it('taker should not withdraw ton from dst escrow when do not know the secret', async () => {
         const wrongSecret = generateRandomBigInt();
-        const { dstEscrow } = await createDstEscrow(order);
+        const { dstEscrow } = await createDstEscrow(order, timelocks);
         const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrow.address));
         const receiverBalanceBefore = await receiver.getBalance();
 

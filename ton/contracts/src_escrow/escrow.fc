@@ -36,6 +36,12 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         storage::creation_time = in_msg_body~load_uint(32);
         storage::expiration_time = in_msg_body~load_uint(32);
 
+        storage::execution_start_time = UINT32_MAX; ;; will be set when taker call claim operation
+        storage::withdrawal_timelock = in_msg_body~load_uint(32);
+        storage::public_withdrawal_timelock = in_msg_body~load_uint(32);
+        storage::cancellation_timelock = in_msg_body~load_uint(32);
+        storage::public_cancellation_timelock = in_msg_body~load_uint(32);
+
         slice maker_cs = (in_msg_body~load_ref()).begin_parse();
         storage::maker_addr = maker_cs~load_msg_addr();
         storage::maker_asset_addr = maker_cs~load_msg_addr();
@@ -45,6 +51,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         slice taker_cs = (in_msg_body~load_ref()).begin_parse();
         storage::taker_asset_addr = taker_cs~load_uint(256);
         storage::taker_asset_amount = taker_cs~load_uint(128);
+        storage::taker_src_addr = empty_slice(); ;; will be set when taker call claim operation
 
         save_data();
         return ();
