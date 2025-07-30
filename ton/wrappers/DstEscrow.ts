@@ -11,7 +11,7 @@ import {
     toNano,
 } from '@ton/core';
 import { EscrowOp } from './opcodes';
-import { OrderConfig } from './types';
+import { OrderConfig, TimelocksConfig } from './types';
 
 export type DstEscrowConfig = {
     lop_address: Address;
@@ -50,8 +50,9 @@ export class DstEscrow implements Contract {
         provider: ContractProvider,
         via: Sender,
         order: OrderConfig,
-        query_id: number = 0,
+        timelocks: TimelocksConfig,
         value: bigint = toNano('0.05'),
+        query_id: number = 0,
     ) {
         await provider.internal(via, {
             value,
@@ -62,6 +63,9 @@ export class DstEscrow implements Contract {
                 .storeUint(order.hashlock, 256)
                 .storeUint(order.creation_time, 32)
                 .storeUint(order.expiration_time, 32)
+                .storeUint(timelocks.dstWithdrawal, 32)
+                .storeUint(timelocks.dstPublicWithdrawal, 32)
+                .storeUint(timelocks.dstCancellation, 32)
                 .storeRef(
                     beginCell()
                         .storeUint(order.maker_address as bigint, 256)

@@ -10,7 +10,7 @@ import {
     toNano,
 } from '@ton/core';
 import { EscrowOp } from './opcodes';
-import { OrderConfig } from './types';
+import { OrderConfig, TimelocksConfig } from './types';
 
 export type SrcEscrowConfig = {
     lop_address: Address;
@@ -49,8 +49,9 @@ export class SrcEscrow implements Contract {
         provider: ContractProvider,
         via: Sender,
         order: OrderConfig,
+        timelocks: TimelocksConfig,
+        value: bigint = toNano(0.05),
         query_id: number = 0,
-        value: bigint = toNano('0.05'),
     ) {
         await provider.internal(via, {
             value,
@@ -61,6 +62,10 @@ export class SrcEscrow implements Contract {
                 .storeUint(order.hashlock, 256)
                 .storeUint(order.creation_time, 32)
                 .storeUint(order.expiration_time, 32)
+                .storeUint(timelocks.srcWithdrawal, 32)
+                .storeUint(timelocks.srcPublicWithdrawal, 32)
+                .storeUint(timelocks.srcCancellation, 32)
+                .storeUint(timelocks.srcPublicCancellation, 32)
                 .storeRef(
                     beginCell()
                         .storeAddress(order.maker_address as Address)

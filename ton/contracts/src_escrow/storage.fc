@@ -18,15 +18,13 @@ global int storage::taker_asset_amount;
 global slice storage::taker_src_addr;
 
 global int storage::execution_start_time;
+global int storage::withdrawal_timelock;
+global int storage::public_withdrawal_timelock;
+global int storage::cancellation_timelock;
+global int storage::public_cancellation_timelock;
 
-
-() init_empty() impure inline {
-    storage::taker_src_addr = empty_slice();
-    storage::execution_start_time = UINT32_MAX;
-}
 
 () load_data() impure inline {
-    init_empty();
     slice ds = get_data().begin_parse();
     storage::lop_address = ds~load_msg_addr();
     storage::order_hash = ds~load_uint(256);
@@ -39,6 +37,12 @@ global int storage::execution_start_time;
     storage::creation_time = ds~load_uint(32);
     storage::expiration_time = ds~load_uint(32);
 
+    storage::execution_start_time = ds~load_uint(32);
+    storage::withdrawal_timelock = ds~load_uint(32);
+    storage::public_withdrawal_timelock = ds~load_uint(32);
+    storage::cancellation_timelock = ds~load_uint(32);
+    storage::public_cancellation_timelock = ds~load_uint(32);
+
     slice ds_maker = (ds~load_ref()).begin_parse();
     storage::maker_addr = ds_maker~load_msg_addr();
     storage::maker_asset_addr = ds_maker~load_msg_addr();
@@ -48,37 +52,33 @@ global int storage::execution_start_time;
     slice ds_taker = (ds~load_ref()).begin_parse();
     storage::taker_asset_addr = ds_taker~load_uint(256);
     storage::taker_asset_amount = ds_taker~load_uint(128);
-
-    if (~ slice_empty?(ds_taker)) {
-        storage::taker_src_addr = ds_taker~load_msg_addr();
-        storage::execution_start_time = ds_taker~load_uint(32);
-    }
+    storage::taker_src_addr = slice_data_empty?(ds_taker) ? empty_slice() : ds_taker~load_msg_addr();
 }
 
 () save_data() impure inline {
-    builder taker_cb = begin_cell()
-        .store_uint(storage::taker_asset_addr, 256)
-        .store_uint(storage::taker_asset_amount, 128);
-
-    if (~ slice_empty?(storage::taker_src_addr)) {
-        taker_cb.store_slice(storage::taker_src_addr);
-        taker_cb.store_uint(storage::execution_start_time, 32);
-    }
-
     set_data(begin_cell()
         .store_slice(storage::lop_address)
         .store_uint(storage::order_hash, 256)
         .store_uint(storage::hashlock, 256)
         .store_uint(storage::creation_time, 32)
         .store_uint(storage::expiration_time, 32)
-        .store_ref(
-            begin_cell()
-                .store_slice(storage::maker_addr)
-                .store_slice(storage::maker_asset_addr)
-                .store_coins(storage::maker_asset_amount)
-                .store_uint(storage::receiver_addr, 256)
-                .end_cell()
-        )
-        .store_ref(taker_cb.end_cell())
+
+        .store_uint(storage::withdrawal_timelock, 32)
+        .store_uint(storage::public_withdrawal_timelock, 32)
+        .store_uint(storage::cancellation_timelock, 32)
+        .store_uint(storage::public_cancellation_timelock, 32)
+        .store_uint(storage::execution_start_time, 32)
+
+        .store_ref(begin_cell()
+                    .store_slice(storage::maker_addr)
+                    .store_slice(storage::maker_asset_addr)
+                    .store_coins(storage::maker_asset_amount)
+                    .store_uint(storage::receiver_addr, 256)
+                    .end_cell())
+        .store_ref(begin_cell()
+                    .store_uint(storage::taker_asset_addr, 256)
+                    .store_uint(storage::taker_asset_amount, 128)
+                    .store_slice(storage::taker_src_addr)
+                    .end_cell())
         .end_cell());
 }

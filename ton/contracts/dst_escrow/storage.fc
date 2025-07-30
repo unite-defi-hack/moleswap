@@ -16,6 +16,11 @@ global slice storage::taker_addr;
 global slice storage::taker_asset_addr;
 global int storage::taker_asset_amount;
 
+global int storage::execution_start_time;
+global int storage::withdrawal_timelock;
+global int storage::public_withdrawal_timelock;
+global int storage::cancellation_timelock;
+
 
 () load_data() impure inline {
     slice ds = get_data().begin_parse();
@@ -27,6 +32,11 @@ global int storage::taker_asset_amount;
     storage::hashlock = ds~load_uint(256);
     storage::creation_time = ds~load_uint(32);
     storage::expiration_time = ds~load_uint(32);
+
+    storage::execution_start_time = ds~load_uint(32);
+    storage::withdrawal_timelock = ds~load_uint(32);
+    storage::public_withdrawal_timelock = ds~load_uint(32);
+    storage::cancellation_timelock = ds~load_uint(32);
 
     slice ds_maker = (ds~load_ref()).begin_parse();
     storage::maker_addr = ds_maker~load_uint(256);
@@ -47,20 +57,20 @@ global int storage::taker_asset_amount;
         .store_uint(storage::hashlock, 256)
         .store_uint(storage::creation_time, 32)
         .store_uint(storage::expiration_time, 32)
-        .store_ref(
-            begin_cell()
-                .store_uint(storage::maker_addr, 256)
-                .store_uint(storage::maker_asset_addr, 256)
-                .store_uint(storage::maker_asset_amount, 128)
-                .store_slice(storage::receiver_addr)
-                .end_cell()
-        )
-        .store_ref(
-            begin_cell()
-                .store_slice(storage::taker_addr)
-                .store_slice(storage::taker_asset_addr)
-                .store_coins(storage::taker_asset_amount)
-                .end_cell()
-        )
+        .store_uint(storage::execution_start_time, 32)
+        .store_uint(storage::withdrawal_timelock, 32)
+        .store_uint(storage::public_withdrawal_timelock, 32)
+        .store_uint(storage::cancellation_timelock, 32)
+        .store_ref(begin_cell()
+                    .store_uint(storage::maker_addr, 256)
+                    .store_uint(storage::maker_asset_addr, 256)
+                    .store_uint(storage::maker_asset_amount, 128)
+                    .store_slice(storage::receiver_addr)
+                    .end_cell())
+        .store_ref(begin_cell()
+                    .store_slice(storage::taker_addr)
+                    .store_slice(storage::taker_asset_addr)
+                    .store_coins(storage::taker_asset_amount)
+                    .end_cell())
         .end_cell());
 }

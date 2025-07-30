@@ -35,6 +35,11 @@ const exec_fee = 30000000;  ;; 0.03 TON
         storage::creation_time = in_msg_body~load_uint(32);
         storage::expiration_time = in_msg_body~load_uint(32);
 
+        storage::execution_start_time = now();
+        storage::withdrawal_timelock = in_msg_body~load_uint(32);
+        storage::public_withdrawal_timelock = in_msg_body~load_uint(32);
+        storage::cancellation_timelock = in_msg_body~load_uint(32);
+
         slice maker_cs = (in_msg_body~load_ref()).begin_parse();
         storage::maker_addr = maker_cs~load_uint(256);
         storage::maker_asset_addr = maker_cs~load_uint(256);
