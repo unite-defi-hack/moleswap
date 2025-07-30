@@ -1,0 +1,51 @@
+[profile.default]
+src = 'src'
+out = 'out'
+libs = ['external']
+test = 'test'
+cache_path = 'cache'
+broadcast = 'broadcast'
+
+# Remappings to external submodules
+remappings = [
+    'cross-chain-swap/=external/cross-chain-resolver-example/contracts/lib/cross-chain-swap'
+]
+
+# Compiler settings (matching cross-chain-swap config)
+optimizer = true
+optimizer_runs = 1000000
+via_ir = true
+evm_version = 'shanghai'
+solc_version = '0.8.23'
+
+# Gas reporting for deployed contracts
+gas_reports = [
+    "LimitOrderProtocol", 
+    "EscrowFactory", 
+    "Resolver", 
+    "MockERC20",
+    "ERC20True"
+]
+
+# File permissions for config read/write
+fs_permissions = [
+    { access = "read-write", path = "./" },
+    { access = "read", path = "./external" },
+    { access = "read", path = "./broadcast" },
+    { access = "write", path = "./deploy-config.json" }
+]
+
+# Formatter settings
+[fmt]
+line_length = 140
+bracket_spacing = true
+multiline_func_header = 'params_first'
+wrap_comments = true
+
+# Fuzz testing
+[fuzz]
+runs = 1024
+
+# RPC endpoints
+[rpc_endpoints]
+sepolia = "${SEPOLIA_RPC_URL}"

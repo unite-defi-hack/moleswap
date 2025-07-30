@@ -2,3 +2,6 @@
 	path = 1inch-cross-chain-sdk
 	url = git@github.com:unite-defi-hack/cross-chain-sdk.git
 	branch = feat/ton
+[submodule "1inch-evm-leg-deploy/external/cross-chain-resolver-example"]
+	path = 1inch-evm-leg-deploy/external/cross-chain-resolver-example
+	url = git@github.com:1inch/cross-chain-resolver-example.git
