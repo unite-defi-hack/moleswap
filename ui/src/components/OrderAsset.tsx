@@ -11,9 +11,17 @@ interface OrderAssetProps {
     amount: string;
     onAssetChange: (asset: Asset) => void;
     onAmountChange: (amount: string) => void;
+    isProcessing?: boolean;
 }
 
-export const OrderAsset: React.FC<OrderAssetProps> = ({ label, asset, amount, onAssetChange, onAmountChange }) => {
+export const OrderAsset: React.FC<OrderAssetProps> = ({ 
+    label, 
+    asset, 
+    amount, 
+    onAssetChange, 
+    onAmountChange,
+    isProcessing = false 
+}) => {
     const [usdValue, setUsdValue] = useState<string>('');
     const [usdPrice, setUsdPrice] = useState<number>(0);
 
@@ -27,7 +35,7 @@ export const OrderAsset: React.FC<OrderAssetProps> = ({ label, asset, amount, on
         };
 
         fetchPrice();
-    }, [amount]);
+    }, [asset.coinGeckoId]);
 
     useEffect(() => {
         if (amount && !isNaN(parseFloat(amount.replace(/,/g, '')))) {
@@ -40,10 +48,16 @@ export const OrderAsset: React.FC<OrderAssetProps> = ({ label, asset, amount, on
     }, [amount, usdPrice]);
 
     return (
-        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+        <div className={`bg-gray-50 rounded-xl p-4 border border-gray-200 ${isProcessing ? 'ring-2 ring-blue-200' : ''}`}>
             <div className="mb-1">
                 <div className="flex justify-between items-center mb-3">
                     <span className="text-sm font-medium text-gray-600">{label}</span>
+                    {isProcessing && (
+                        <div className="flex items-center space-x-1">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                            <span className="text-xs text-blue-600">Processing</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex justify-between items-center mb-3">
@@ -56,6 +70,7 @@ export const OrderAsset: React.FC<OrderAssetProps> = ({ label, asset, amount, on
                             onChange={(e) => onAmountChange(e.target.value)}
                             className="bg-transparent text-right text-2xl font-semibold text-gray-900 border-none outline-none w-20"
                             placeholder="0"
+                            disabled={isProcessing}
                         />
                     </div>
                 </div>
