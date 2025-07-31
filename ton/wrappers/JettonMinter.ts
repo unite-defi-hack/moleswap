@@ -58,7 +58,7 @@ export class JettonMinter implements Contract {
     static mintMessage(to: Address, jetton_amount: bigint, forward_ton_amount: bigint, total_ton_amount: bigint) {
         return beginCell()
             .storeUint(JettonOp.mint, 32)
-            .storeUint(0, 64) // op, queryId
+            .storeUint(0, 64) // queryId
             .storeAddress(to)
             .storeCoins(jetton_amount)
             .storeCoins(forward_ton_amount)
@@ -71,8 +71,8 @@ export class JettonMinter implements Contract {
         via: Sender,
         to: Address,
         jetton_amount: bigint,
-        forward_ton_amount: bigint,
-        total_ton_amount: bigint,
+        forward_ton_amount: bigint = toNano(0.1),
+        total_ton_amount: bigint = toNano(0.15),
     ) {
         await provider.internal(via, {
             sendMode: SendMode.PAY_GAS_SEPARATELY,
