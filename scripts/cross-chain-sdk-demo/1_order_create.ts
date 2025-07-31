@@ -113,7 +113,9 @@ async function main() {
         extension: order.extension.encode(),
         signature,
         secret,
-        secretHash
+        hashlock: secretHash,
+        orderHash: order.getOrderHash(config.sourceChainId),
+        expirationTime: new Date(Number(order.deadline) * 1000).toISOString()
     }
 
     console.log('\n–––––––– Generated Cross-Chain Order ––––––––')
