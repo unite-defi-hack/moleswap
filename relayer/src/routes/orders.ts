@@ -24,6 +24,7 @@ import {
   generateOrderHash, 
   verifyOrderSignature 
 } from '../utils/orderHashing';
+import { verifySecretHashlock } from '../utils/secretGeneration';
 
 
 const router = Router();
@@ -179,6 +180,26 @@ router.post('/complete', async (req: Request, res: Response) => {
         }
       };
       return res.status(409).json(response);
+    }
+
+    // Validate that secret corresponds to secretHash
+    const secretValidation = verifySecretHashlock(completeOrder.secret, completeOrder.secretHash);
+    if (!secretValidation.valid) {
+      logger.error('Secret validation failed', { 
+        error: secretValidation.error,
+        orderHash 
+      });
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.INVALID_ORDER,
+          message: 'Secret validation failed',
+          details: {
+            error: secretValidation.error
+          }
+        }
+      };
+      return res.status(400).json(response);
     }
 
     const orderWithMeta = await insertOrder({

@@ -16,15 +16,13 @@ export function generateSecret(): string {
  * @returns 32-byte hashlock as hex string
  */
 export function generateHashlock(secret: string): string {
-  // Remove 0x prefix if present
-  const cleanSecret = secret.startsWith('0x') ? secret.slice(2) : secret;
+  // Create Keccak256 hash (same as ethers.keccak256)
+  // Note: Node.js crypto doesn't have a direct Keccak256, so we'll use ethers.js
+  const { ethers } = require('ethers');
   
-  // Create SHA256 hash
-  const hash = crypto.createHash('sha256');
-  hash.update(Buffer.from(cleanSecret, 'hex'));
-  const hashlock = hash.digest('hex');
-  
-  return `0x${hashlock}`;
+  // Ensure secret has 0x prefix for ethers.js
+  const secretWithPrefix = secret.startsWith('0x') ? secret : `0x${secret}`;
+  return ethers.keccak256(secretWithPrefix);
 }
 
 /**

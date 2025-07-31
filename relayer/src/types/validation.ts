@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import { OrderStatus, OrderValidationSchemas, OrderConstants } from './orders';
+import { verifySecretHashlock } from '../utils/secretGeneration';
 
 /**
  * Joi validation schemas for order-related requests
@@ -493,12 +494,19 @@ export const validateCompleteOrder = (data: any) => {
       ? ['Secret hash must match the makerTraits (hashlock)'] 
       : []
   };
+
+  // Validate that secret corresponds to secretHash
+  const secretValidation = verifySecretHashlock(value.completeOrder.secret, value.completeOrder.secretHash);
+  const secretValidationErrors = !secretValidation.valid 
+    ? [`Secret validation failed: ${secretValidation.error}`] 
+    : [];
   
   const allErrors = [
     ...(amountValidation.errors || []),
     ...(addressValidation.errors || []),
     ...(saltValidation.errors || []),
-    ...(secretHashValidation.errors || [])
+    ...(secretHashValidation.errors || []),
+    ...(secretValidationErrors || [])
   ];
   
   return {
