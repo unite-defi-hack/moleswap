@@ -7,7 +7,7 @@ export const ORDER_CONFIG = {
     destinationChainId: 2, // Ethereum
     
     // Addresses (these would be fetched from environment or contract deployment)
-    escrowFactoryAddress: 'kQAU6TikP2x2EX35n1o1EV7TRRYBlUzUCwPmpz7wAt8NI3wo',
+    escrowFactoryAddress: '0x0000000000000000000000000000000000000000', // Placeholder - should be actual deployed address
     resolverProxyAddress: '0x0000000000000000000000000000000000000000', // Placeholder
     
     // Token addresses
