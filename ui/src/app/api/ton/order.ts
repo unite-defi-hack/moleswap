@@ -2,6 +2,16 @@ import { Asset } from '@/app/assets';
 import { Address, beginCell, toNano } from '@ton/core';
 import { CHAIN, TonConnectUI } from '@tonconnect/ui-react';
 import { ethers } from 'ethers';
+import {
+    Address as InchAddress,
+    HashLock,
+    TimeLocks,
+    EvmCrossChainOrder,
+    AuctionDetails,
+    EvmAddress,
+    TonAddress,
+    randBigInt,
+} from '@1inch/cross-chain-sdk';
 import { 
     generateRandomBigInt, 
     ethAddressToBigInt, 
@@ -11,7 +21,6 @@ import {
     createTimeLocks,
     createSafetyDeposits,
     createAuctionDetails,
-    randBigInt,
     UINT_40_MAX,
     safeStringify
 } from '../utils';
@@ -40,80 +49,87 @@ export const createCrossChainOrder = async (
     // ----------------------------------------------------------------------------
     // 1. Secret & Hash-lock
     // ----------------------------------------------------------------------------
-    const secret = generateSecret();
-    const hashLock = await createHashLock(secret);
-    const secretHash = hashLock;
+    const secretBytes = new Uint8Array(32);
+    crypto.getRandomValues(secretBytes);
+    const secret = '0x' + Array.from(secretBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    const hashLock = HashLock.forSingleFill(secret);
+    const secretHash = hashLock.toString();
 
     // ----------------------------------------------------------------------------
-    // 2. Time-locks & Safety deposits
+    // 2. Time-locks & Safety deposits (very short demo values)
     // ----------------------------------------------------------------------------
-    const timeLocks = createTimeLocks();
-    const safetyDeposits = {
-        srcSafetyDeposit: BigInt(ORDER_CONFIG.srcSafetyDeposit),
-        dstSafetyDeposit: BigInt(ORDER_CONFIG.dstSafetyDeposit)
-    };
+    const timeLocks = TimeLocks.new({
+        srcWithdrawal: BigInt(10),
+        srcPublicWithdrawal: BigInt(12000),
+        srcCancellation: BigInt(18000),
+        srcPublicCancellation: BigInt(24000),
+        dstWithdrawal: BigInt(10),
+        dstPublicWithdrawal: BigInt(120),
+        dstCancellation: BigInt(180)
+    });
+
+    const SRC_SAFETY_DEPOSIT = BigInt(ORDER_CONFIG.srcSafetyDeposit);
+    const DST_SAFETY_DEPOSIT = BigInt(ORDER_CONFIG.dstSafetyDeposit);
 
     // ----------------------------------------------------------------------------
     // 3. Auction parameters (no auction - fixed price)
     // ----------------------------------------------------------------------------
-    const auctionDetails = createAuctionDetails();
+    const auctionDetails = AuctionDetails.noAuction();
 
     // ----------------------------------------------------------------------------
     // 4. Build Cross-Chain Order
     // ----------------------------------------------------------------------------
-    const makingAmount = BigInt(Math.floor(fromAmount * 1e9)); // Convert to nano
-    const takingAmount = BigInt(Math.floor(toAmount * 1e9)); // Convert to nano
+    const MAKING_AMOUNT = BigInt(Math.floor(fromAmount * 1e9)); // Convert to nano
+    const TAKING_AMOUNT = BigInt(Math.floor(toAmount * 1e9)); // Convert to nano
+
     const nonce = randBigInt(UINT_40_MAX);
 
-    // Create order structure similar to 1_order_create.ts
-    const order = {
-        escrowFactory: ESCROW_FACTORY.toString(),
-        makerAsset: fromAsset.tokenAddress,
-        takerAsset: toAsset.tokenAddress,
-        makingAmount: makingAmount.toString(),
-        takingAmount: takingAmount.toString(),
-        maker: toAddress, // This would be the user's address
-        receiver: toAddress,
-        hashLock: secretHash,
-        srcChainId: fromAsset.network,
-        dstChainId: toAsset.network,
-        srcSafetyDeposit: safetyDeposits.srcSafetyDeposit.toString(),
-        dstSafetyDeposit: safetyDeposits.dstSafetyDeposit.toString(),
-        timeLocks: {
-            srcWithdrawal: timeLocks.srcWithdrawal.toString(),
-            srcPublicWithdrawal: timeLocks.srcPublicWithdrawal.toString(),
-            srcCancellation: timeLocks.srcCancellation.toString(),
-            srcPublicCancellation: timeLocks.srcPublicCancellation.toString(),
-            dstWithdrawal: timeLocks.dstWithdrawal.toString(),
-            dstPublicWithdrawal: timeLocks.dstPublicWithdrawal.toString(),
-            dstCancellation: timeLocks.dstCancellation.toString()
+    const order = EvmCrossChainOrder.new(
+        new EvmAddress(new InchAddress(ORDER_CONFIG.escrowFactoryAddress)),
+        {
+            makerAsset: new EvmAddress(new InchAddress(fromAsset.tokenAddress)),
+            takerAsset: TonAddress.NATIVE,
+            makingAmount: MAKING_AMOUNT,
+            takingAmount: TAKING_AMOUNT,
+            maker: new EvmAddress(new InchAddress(toAddress)),
+            receiver: new TonAddress("UQCVzWSLLWSRcex7lHcMnfnk3j4cCVHrNlVGQQSzE9L6FU13"),
         },
-        auction: {
-            noAuction: auctionDetails.noAuction,
-            startTime: auctionDetails.startTime.toString(),
-            endTime: auctionDetails.endTime.toString(),
-            minBid: auctionDetails.minBid.toString()
+        {
+            hashLock,
+            srcChainId: ORDER_CONFIG.sourceChainId as any,
+            dstChainId: ORDER_CONFIG.destinationChainId as any,
+            srcSafetyDeposit: SRC_SAFETY_DEPOSIT,
+            dstSafetyDeposit: DST_SAFETY_DEPOSIT,
+            timeLocks
         },
-        allowPartialFills: false,
-        allowMultipleFills: false,
-        nonce: nonce.toString()
-    };
+        {
+            auction: auctionDetails,
+            whitelist: [
+                { address: new EvmAddress(new InchAddress(ORDER_CONFIG.resolverProxyAddress)), allowFrom: BigInt(0) },
+            ]
+        },
+        {
+            allowPartialFills: false,
+            allowMultipleFills: false,
+            nonce: nonce
+        }
+    );
 
     // ----------------------------------------------------------------------------
     // 5. Sign the order (EIP-712)
     // ----------------------------------------------------------------------------
     // For now, we'll create a simple signature
-    // In production, this would use proper EIP-712 signing
-    const orderData = safeStringify(order);
+    // In production, this would use proper EIP-712 signing with the user's wallet
+    const orderData = safeStringify(order.build());
     const signature = ethers.keccak256(ethers.toUtf8Bytes(orderData)).slice(0, 66); // Simple hash signature
 
-    const orderHash = ethers.keccak256(ethers.toUtf8Bytes(orderData));
-    const expirationTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24 hours from now
+    const orderHash = order.getOrderHash(ORDER_CONFIG.sourceChainId);
+    const expirationTime = new Date(Number(order.deadline) * 1000).toISOString();
 
     return {
-        order,
-        extension: btoa(orderData), // Base64 encode the order data
-        signature: signature as string,
+        order: order.build(),
+        extension: order.extension.encode(),
+        signature,
         secret,
         hashlock: secretHash,
         orderHash,
