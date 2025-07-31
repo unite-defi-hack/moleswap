@@ -35,7 +35,7 @@ const COMPLETE_ORDERS = [
       receiver: "0x0000000000000000000000000000000000000000"
     },
     extension: "0x0000010f0000004a0000004a0000004a0000004a000000250000000000000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b688aa0008863b00397a9e212049500000800bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b453500000000000000000000000000000000000000000000000000000000000014a3400000000000000000000000010563e509b718a279de002dfc3e94a8a8f642b030000000000000000000000e8d4a510000000000000000000000000e8d4a5100000000000000000b4000000780000000a00005dc00000465000002ee00000000a",
-    signature: "0xd2a930eafc1768097d2f49f70a87f4bae6ea93cd5ca8671ab40931529bcf022b27158a5bc7407796c8f0109a22b92e9079e3dc31f626c5430056031d38fafba61c",
+    signature: "", // Will be generated dynamically
     secret: "0x63b5eefdca0982721a0a673399bef816ee7522a9e77483d14466a666e859f3aa",
     secretHash: "0x00bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b45350"
   }
@@ -191,7 +191,49 @@ class RelayerClient {
     try {
       logger.info('Creating complete order with extension, secret, and secretHash...');
       
-      const request: CreateCompleteOrderRequest = { completeOrder };
+      // Generate a proper signature for the complete order
+      const domain = {
+        name: 'MoleSwap Relayer',
+        version: '1.0.0',
+        chainId: 1,
+        verifyingContract: '0x0000000000000000000000000000000000000000'
+      };
+      
+      const types = {
+        Order: [
+          { name: 'maker', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
+          { name: 'makerTraits', type: 'bytes32' },
+          { name: 'salt', type: 'uint256' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
+          { name: 'receiver', type: 'address' }
+        ]
+      };
+      
+      // Use a test private key that corresponds to the maker address
+      const testPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+      const testWallet = new ethers.Wallet(testPrivateKey);
+      
+      // Create a test order with the test wallet's address
+      const testCompleteOrder = {
+        ...completeOrder,
+        order: {
+          ...completeOrder.order,
+          maker: testWallet.address
+        }
+      };
+      
+      const signature = await testWallet.signTypedData(domain, types, testCompleteOrder.order);
+      
+      const request: CreateCompleteOrderRequest = { 
+        completeOrder: {
+          ...testCompleteOrder,
+          signature: signature
+        }
+      };
+      
       const response = await axios.post(`${this.baseURL}/api/orders/complete`, request);
       
       logger.info('Complete order created successfully:', response.data);
