@@ -486,6 +486,8 @@ builder store_maybe_ref(builder b, cell c) asm(c b) "STOPTREF";
     where `u`, `x`, and `s` have the same meaning as for `addr_std`.
 -}
 
+
+
 ;;; Loads from slice [s] the only prefix that is a valid `MsgAddress`,
 ;;; and returns both this prefix `s'` and the remainder `s''` of [s] as slices.
 (slice, slice) load_msg_addr(slice s) asm( -> 1 0) "LDMSGADDR";
@@ -629,3 +631,6 @@ builder store_builder(builder to, builder from) asm "STBR";
 
 ;;; Returns an empty slice
 slice empty_slice() asm "x{} PUSHSLICE";
+
+;;; Retrieves code of smart-contract from c7
+cell my_code() asm "MYCODE";

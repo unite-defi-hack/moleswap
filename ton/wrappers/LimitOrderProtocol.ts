@@ -62,7 +62,7 @@ export class LimitOrderProtocol implements Contract {
         provider: ContractProvider,
         via: Sender,
         order: OrderConfig,
-        value: bigint = toNano(0.05),
+        value: bigint = toNano(0.08),
         queryId: number = 0,
     ) {
         return await provider.internal(via, {
@@ -93,7 +93,7 @@ export class LimitOrderProtocol implements Contract {
         provider: ContractProvider,
         via: Sender,
         order: OrderConfig,
-        value: bigint = toNano(0.05),
+        value: bigint = toNano(0.08),
         queryId: number = 0,
     ) {
         return await provider.internal(via, {

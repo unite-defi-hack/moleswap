@@ -107,6 +107,20 @@ describe('UserOrder', () => {
         return { result, orderHash };
     }
 
+    async function createJettonOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+        const result = await lopSC.sendCreateOrder(maker.getSender(), order);
+
+        expect(result.transactions).toHaveTransaction({
+            from: maker.address,
+            to: lopSC.address,
+            op: LopOp.create_order,
+            success: true,
+        });
+
+        const orderHash = LimitOrderProtocol.calculateOrderHash(order);
+        return { result, orderHash };
+    }
+
     it('create a new order successful', async () => {
         const { result, orderHash } = await createOrder(srcOrder);
         const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
@@ -163,5 +177,30 @@ describe('UserOrder', () => {
         expect(orderData.takerAddress.toString()).toEqual(dstOrder.taker_address!!.toString());
         expect(orderData.takerAssetAddress.toString()).toEqual(dstOrder.taker_asset.toString());
         expect(orderData.takerAssetAmount).toEqual(dstOrder.taking_amount);
+    });
+
+    it('create a new order with jetton successful', async () => {
+        const { result, orderHash } = await createOrder(srcOrder);
+        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+
+        expect(result.transactions).toHaveTransaction({
+            from: lopSC.address,
+            to: srcEscrowAddress,
+            op: EscrowOp.create,
+            success: true,
+        });
+
+        const srcEscrowSC = blockchain.openContract(SrcEscrow.createFromAddress(srcEscrowAddress));
+        const orderData = await srcEscrowSC.getEscrowData();
+        expect(orderData.orderHash).toEqual(orderHash);
+        expect(orderData.hashlock).toEqual(srcOrder.hashlock);
+        expect(orderData.creationTime).toEqual(srcOrder.creation_time);
+        expect(orderData.expirationTime).toEqual(srcOrder.expiration_time);
+        expect(orderData.makerAddress.toString()).toEqual(srcOrder.maker_address.toString());
+        expect(orderData.makerAssetAddress.toString()).toEqual(srcOrder.maker_asset.toString());
+        expect(orderData.makerAssetAmount).toEqual(srcOrder.making_amount);
+        expect(orderData.receiverAddress).toEqual(srcOrder.receiver_address);
+        expect(orderData.takerAssetAddress).toEqual(srcOrder.taker_asset);
+        expect(orderData.takerAssetAmount).toEqual(srcOrder.taking_amount);
     });
 });

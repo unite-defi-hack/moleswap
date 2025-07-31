@@ -1,5 +1,6 @@
 const int error::not_enough_ton = 400;
 const int error::not_enough_asset = 401;
+const int error::invalid_asset_address = 402;
 const int error::forbidden = 403;
 const int error::wrong_workchain = 405;
 const int error::already_claimed = 406;
@@ -11,3 +12,25 @@ const int error::public_withdraw_timelock_not_passed = 411;
 const int error::cancelation_phase_started = 412;
 const int error::cancelation_phase_not_started = 413;
 const int error::not_implemented = 501;
+
+;; jetton wallet errors
+const int error::unauthorized_transfer = 705;
+const int error::not_enough_jettons = 706;
+const int error::unauthorized_incoming_transfer = 707;
+const int error::burn_fee_not_matched = 707;
+const int error::malformed_forward_payload = 708;
+const int error::not_enough_tons = 709;
+const int error::unknown_action = 0xFFFF;
+const int error::unknown_action_bounced = 0xFFF0;
+
+;; jetton minter errors
+const int error::unauthorized_change_storage_request = 71;
+const int error::unauthorized_mint_request = 73;
+const int error::unauthorized_burn_request = 74;
+const int error::discovery_fee_not_matched = 75;
+const int error::unauthorized_change_admin_request = 76;
+const int error::unauthorized_change_content_request = 77;
+const int error::unauthorized_change_code_request = 79;
+
+;; other
+const int error::unknown_op = 0xffff;

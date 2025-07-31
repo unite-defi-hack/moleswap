@@ -9,6 +9,7 @@
 #pragma version >=0.4.4;
 
 const exec_fee = 30000000;  ;; 0.03 TON
+const operational_fees = 1000000;  ;; 0.001 TON
 
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -59,6 +60,13 @@ const exec_fee = 30000000;  ;; 0.03 TON
     }
 
     if (op == op::withdraw) {
+        throw_unless(error::forbidden,
+            equal_slice_bits(sender_address, storage::taker_addr));
+        throw_unless(error::withdraw_timelock_not_passed,
+            now() >= storage::execution_start_time + storage::withdrawal_timelock);
+        throw_unless(error::cancelation_phase_started,
+            now() < storage::execution_start_time + storage::cancellation_timelock);
+
         int secret = in_msg_body~load_uint(256);
         validate_secret(secret, storage::hashlock);
 
@@ -67,18 +75,28 @@ const exec_fee = 30000000;  ;; 0.03 TON
     }
 
     if (op == op::public_withdraw) {
-        throw(error::not_implemented);
-        ;; return ();
+        ;; ideally this should be allowed for token holders only
+        throw_unless(error::public_withdraw_timelock_not_passed,
+            now() >= storage::execution_start_time + storage::public_withdrawal_timelock);
+        throw_unless(error::cancelation_phase_started,
+            now() < storage::execution_start_time + storage::cancellation_timelock);
+
+        int secret = in_msg_body~load_uint(256);
+        validate_secret(secret, storage::hashlock);
+
+        send_ton(storage::receiver_addr, storage::taker_asset_amount + operational_fees);
+        destruct_and_pay(sender_address);
+        return ();
     }
 
     if (op == op::cancel) {
-        throw(error::not_implemented);
-        ;; return ();
-    }
+        throw_unless(error::forbidden,
+            equal_slice_bits(sender_address, storage::taker_addr));
+        throw_unless(error::cancelation_phase_not_started,
+            now() >= storage::execution_start_time + storage::cancellation_timelock);
 
-    if (op == op::rescue_funds) {
-        throw(error::not_implemented);
-        ;; return ();
+        destruct_and_pay(storage::taker_addr);
+        return ();
     }
 
     throw(0xffff);

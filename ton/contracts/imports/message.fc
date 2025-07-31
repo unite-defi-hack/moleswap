@@ -28,6 +28,10 @@ builder store_msgbody_prefix_slice(builder b) inline {
     return b.store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1);
 }
 
+builder store_msgbody_prefix_ref(builder b, cell ref) inline {
+    return b.store_uint(1, 1 + 4 + 4 + 64 + 32 + 1 + 1).store_ref(ref);
+}
+
 () send_message_with_stateinit(slice to, cell msg_body, cell state_init, int amount, int mode) impure inline_ref {
     cell msg = begin_cell()
         .store_msg_flag(msg_flag::bounceable)
