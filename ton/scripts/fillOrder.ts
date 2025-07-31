@@ -24,13 +24,14 @@ function parseOrder(orderJsonPath: string): OrderConfig {
     const jsonData = JSON.parse(readFileSync(orderJsonPath, 'utf-8'));
 
     return {
-        maker_address: Address.parse(jsonData.maker_address),
-        maker_asset: Address.parse(jsonData.maker_asset),
+        maker_address: ethAddressToBigInt(jsonData.maker_address),
+        maker_asset: ethAddressToBigInt(jsonData.maker_asset),
         making_amount: BigInt(jsonData.making_amount),
-        receiver_address: ethAddressToBigInt(jsonData.receiver_address),
-        taker_asset: ethAddressToBigInt(jsonData.taker_asset),
+        receiver_address: Address.parse(jsonData.receiver_address),
+        taker_address: Address.parse(jsonData.taker_address),
+        taker_asset: Address.parse(jsonData.taker_asset),
         taking_amount: BigInt(jsonData.taking_amount),
-        salt: BigInt(jsonData.salt),
+        order_hash: BigInt(jsonData.order_hash),
         creation_time: Math.floor(new Date(jsonData.creation_time).getTime() / 1000),
         expiration_time: Math.floor(new Date(jsonData.expiration_time).getTime() / 1000),
         hashlock: BigInt(jsonData.hashlock!!),
