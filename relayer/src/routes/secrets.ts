@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { ethers } from 'ethers';
 import { logger } from '../utils/logger';
 import { createError } from '../middleware/errorHandler';
 import { 
@@ -10,11 +11,7 @@ import {
   validateOrderForSecretSharing, 
   getOrderSecret 
 } from '../database/orderService';
-import { 
-  getEncryptionKey, 
-  verifySecretHashlock, 
-  decryptSecret 
-} from '../utils/secretGeneration';
+
 import { EscrowValidationService } from '../services/escrowValidationService';
 import { validateSecretRequest } from '../types/validation';
 
@@ -151,8 +148,8 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
     }
     
     // Get the stored secret for this order
-    const storedEncryptedSecret = await getOrderSecret(orderHash);
-    if (!storedEncryptedSecret) {
+    const storedSecret = await getOrderSecret(orderHash);
+    if (!storedSecret) {
       logger.error('No secret found for order', { orderHash });
       
       const response: ApiResponse<null> = {
@@ -166,17 +163,14 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       return res.status(500).json(response);
     }
 
-    // Decrypt the stored secret
-    const encryptionKey = getEncryptionKey();
-    const secret = decryptSecret(storedEncryptedSecret, encryptionKey);
-    
-    // Verify the secret matches the order's hashlock
+    // Verify the secret matches the order's hashlock (makerTraits)
     const order = orderValidation.order!;
-    const secretValidation = verifySecretHashlock(secret, order.hashlock);
-    if (!secretValidation.valid) {
+    const expectedHash = ethers.keccak256(storedSecret);
+    if (expectedHash !== order.hashlock) {
       logger.error('Stored secret does not match order hashlock', {
         orderHash,
-        orderHashlock: order.hashlock
+        orderHashlock: order.hashlock,
+        secretHash: expectedHash
       });
       
       const response: ApiResponse<null> = {
@@ -190,11 +184,11 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       return res.status(500).json(response);
     }
     
-    // Return the decrypted secret to the requester
+    // Return the secret to the requester
     const response: ApiResponse<SecretRequestResponse> = {
       success: true,
       data: {
-        secret,
+        secret: storedSecret,
         orderHash,
         validationResult: {
           srcEscrow: {
@@ -214,7 +208,7 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       orderHash,
       srcEscrowAddress,
       dstEscrowAddress,
-      secretPrefix: secret.slice(0, 10) + '...' // Log partial secret for security
+      secretPrefix: storedSecret.slice(0, 10) + '...' // Log partial secret for security
     });
     
     return res.json(response);

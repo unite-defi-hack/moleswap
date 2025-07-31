@@ -7,10 +7,7 @@ import { db } from '../../database/connection';
 import { 
   insertOrder
 } from '../../database/orderService';
-import { 
-  generateSecretWithHashlock, 
-  getEncryptionKey 
-} from '../../utils/secretGeneration';
+import { ethers } from 'ethers';
 import { OrderStatus } from '../../types/orders';
 
 let app: any;
@@ -40,18 +37,30 @@ describe('POST /api/secrets/:orderHash', () => {
     await db('orders').del();
     await db('escrow_validations').del();
     
-    // Insert test order
-    const encryptionKey = getEncryptionKey();
-    const { hashlock, encryptedSecret } = generateSecretWithHashlock(encryptionKey);
+    // Create a test order with user-provided secret (new flow)
+    const secret = ethers.randomBytes(32);
+    const secretHash = ethers.keccak256(secret);
+    
+    // Update test order to use the secret hash as makerTraits
+    const updatedTestOrder = {
+      ...testOrder,
+      makerTraits: secretHash
+    };
     
     await insertOrder({
-      order: testOrder,
+      order: updatedTestOrder,
       orderHash: testOrderHash,
       status: OrderStatus.ACTIVE,
-      hashlock,
-      secret: encryptedSecret, // Store the encrypted secret
-      orderData: { ...testOrder, salt: testOrder.salt },
-      signedData: { order: testOrder, signature: '0x' + 'a'.repeat(130) }
+      hashlock: secretHash,
+      secret: ethers.hexlify(secret), // Store the secret directly
+      secretHash: secretHash,
+      orderData: updatedTestOrder,
+      signedData: { 
+        order: updatedTestOrder, 
+        signature: '0x' + 'a'.repeat(130),
+        secret: ethers.hexlify(secret),
+        secretHash: secretHash
+      }
     });
   });
 

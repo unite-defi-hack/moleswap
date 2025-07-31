@@ -21,6 +21,26 @@ const REAL_ORDERS = [
   }
 ];
 
+// Complete order data with extension, secret, and secretHash
+const COMPLETE_ORDERS = [
+  {
+    order: {
+      maker: "0x71078879cd9a1d7987b74cee6b6c0d130f1a0115",
+      makerAsset: "0x10563e509b718a279de002dfc3e94a8a8f642b03",
+      takerAsset: "0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c",
+      makerTraits: "0x00bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b45350",
+      salt: "8055219788148251265908589343240715975237002832007417457800707733977",
+      makingAmount: "1000000000000000000",
+      takingAmount: "2000000000000000000",
+      receiver: "0x0000000000000000000000000000000000000000"
+    },
+    extension: "0x0000010f0000004a0000004a0000004a0000004a000000250000000000000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b688aa0008863b00397a9e212049500000800bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b453500000000000000000000000000000000000000000000000000000000000014a3400000000000000000000000010563e509b718a279de002dfc3e94a8a8f642b030000000000000000000000e8d4a510000000000000000000000000e8d4a5100000000000000000b4000000780000000a00005dc00000465000002ee00000000a",
+    signature: "0xd2a930eafc1768097d2f49f70a87f4bae6ea93cd5ca8671ab40931529bcf022b27158a5bc7407796c8f0109a22b92e9079e3dc31f626c5430056031d38fafba61c",
+    secret: "0x63b5eefdca0982721a0a673399bef816ee7522a9e77483d14466a666e859f3aa",
+    secretHash: "0x00bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b45350"
+  }
+];
+
 interface RealOrder {
   maker: string;
   makerAsset: string;
@@ -32,6 +52,14 @@ interface RealOrder {
   receiver: string;
 }
 
+interface CompleteOrder {
+  order: RealOrder;
+  extension: string;
+  signature: string;
+  secret: string;
+  secretHash: string;
+}
+
 interface SignedOrder {
   order: RealOrder;
   signature: string;
@@ -39,6 +67,10 @@ interface SignedOrder {
 
 interface CreateOrderRequest {
   signedOrder: SignedOrder;
+}
+
+interface CreateCompleteOrderRequest {
+  completeOrder: CompleteOrder;
 }
 
 interface CreateOrderResponse {
@@ -97,25 +129,7 @@ class RelayerClient {
 
   async createOrder(order: RealOrder): Promise<CreateOrderResponse> {
     try {
-      // First, get the order data with hashlock from the /data endpoint
-      const orderDataRequest = { 
-        order: {
-          maker: order.maker,
-          makerAsset: order.makerAsset,
-          takerAsset: order.takerAsset,
-          makingAmount: order.makingAmount,
-          takingAmount: order.takingAmount,
-          receiver: order.receiver
-        }
-      };
-      
-      const dataResponse = await axios.post(`${this.baseURL}/api/orders/data`, orderDataRequest);
-      
-      if (!dataResponse.data.success) {
-        throw new Error('Failed to get order data: ' + dataResponse.data.error?.message);
-      }
-      
-      const { orderToSign } = dataResponse.data.data;
+      logger.info('Creating order with user-provided hashlock...');
       
       // Define the EIP-712 domain and types (matching the relayer's format exactly)
       const domain = {
@@ -139,45 +153,20 @@ class RelayerClient {
       };
       
       // Create a proper EIP-712 signature for testing
-      // For the real order, we need to use a private key that corresponds to the maker address
-      // The maker address is 0x71078879cd9a1d7987b74cee6b6c0d130f1a0115
-      // For testing purposes, we'll use a known private key that generates this address
-      const makerPrivateKey = '0x1234567890123456789012345678901234567890123456789012345678901234'; // This should generate the maker address
-      const makerWallet = new ethers.Wallet(makerPrivateKey);
+      // For testing, we'll use a known private key
+      const testPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+      const testWallet = new ethers.Wallet(testPrivateKey);
       
-      // Verify the wallet address matches the maker
-      if (makerWallet.address.toLowerCase() !== orderToSign.maker.toLowerCase()) {
-        logger.warn(`Wallet address ${makerWallet.address} doesn't match maker ${orderToSign.maker}. Using a different approach.`);
-        
-        // For testing, we'll create a signature that matches the expected maker
-        // In a real scenario, you would use the actual private key of the maker
-        const testPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-        const testWallet = new ethers.Wallet(testPrivateKey);
-        
-        // Create a test order with the test wallet's address
-        const testOrder = {
-          ...orderToSign,
-          maker: testWallet.address
-        };
-        
-        const signature = await testWallet.signTypedData(domain, types, testOrder);
-        
-        const signedOrder: SignedOrder = {
-          order: testOrder,
-          signature: signature
-        };
-        
-        const request: CreateOrderRequest = { signedOrder };
-        const response = await axios.post(`${this.baseURL}/api/orders`, request);
-        logger.info('Order created successfully:', response.data);
-        return response.data;
-      }
+      // Create a test order with the test wallet's address
+      const testOrder = {
+        ...order,
+        maker: testWallet.address
+      };
       
-      // Sign the order using EIP-712
-      const signature = await makerWallet.signTypedData(domain, types, orderToSign);
+      const signature = await testWallet.signTypedData(domain, types, testOrder);
       
       const signedOrder: SignedOrder = {
-        order: orderToSign,
+        order: testOrder,
         signature: signature
       };
       
@@ -191,6 +180,28 @@ class RelayerClient {
         success: false,
         error: {
           code: 'CREATE_ORDER_FAILED',
+          message: error.response?.data?.error?.message || error.message,
+          details: error.response?.data?.error?.details
+        }
+      };
+    }
+  }
+
+  async createCompleteOrder(completeOrder: CompleteOrder): Promise<CreateOrderResponse> {
+    try {
+      logger.info('Creating complete order with extension, secret, and secretHash...');
+      
+      const request: CreateCompleteOrderRequest = { completeOrder };
+      const response = await axios.post(`${this.baseURL}/api/orders/complete`, request);
+      
+      logger.info('Complete order created successfully:', response.data);
+      return response.data;
+    } catch (error: any) {
+      logger.error('Failed to create complete order:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: {
+          code: 'CREATE_COMPLETE_ORDER_FAILED',
           message: error.response?.data?.error?.message || error.message,
           details: error.response?.data?.error?.details
         }
@@ -283,6 +294,28 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
+  // Create complete orders with extension, secret, and secretHash
+  logger.info('Creating complete orders with extension, secret, and secretHash...');
+  const createdCompleteOrders: string[] = [];
+  
+  for (let i = 0; i < COMPLETE_ORDERS.length; i++) {
+    const completeOrder = COMPLETE_ORDERS[i];
+    if (!completeOrder) continue;
+    
+    logger.info(`Creating complete order ${i + 1}/${COMPLETE_ORDERS.length}...`);
+    
+    const result = await client.createCompleteOrder(completeOrder);
+    if (result.success && result.data?.orderHash) {
+      createdCompleteOrders.push(result.data.orderHash);
+      logger.info(`Complete order created with hash: ${result.data.orderHash}`);
+    } else {
+      logger.error(`Failed to create complete order ${i + 1}:`, result.error);
+    }
+    
+    // Add a small delay between requests
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
   // Test secret request with one of the created orders
   if (createdOrders.length > 0) {
     logger.info('Testing secret request...');
@@ -333,4 +366,4 @@ if (require.main === module) {
   });
 }
 
-export { RelayerClient, REAL_ORDERS }; 
+export { RelayerClient, REAL_ORDERS, COMPLETE_ORDERS }; 

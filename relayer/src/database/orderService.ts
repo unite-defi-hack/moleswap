@@ -7,6 +7,8 @@ export interface InsertOrderParams {
   orderHash: string;
   status: OrderStatus;
   secret?: string;
+  secretHash?: string;
+  extension?: string;
   hashlock: string;
   orderData: any;
   signedData: any;
@@ -35,6 +37,8 @@ export async function insertOrder(params: InsertOrderParams): Promise<OrderWithM
     destination_escrow: params.order.dstEscrowAddress || '',
     hashlock: params.hashlock,
     secret: params.secret || null,
+    secret_hash: params.secretHash || null,
+    extension: params.extension || null,
     status: params.status,
     order_data: JSON.stringify(params.orderData),
     signed_data: JSON.stringify(params.signedData),
@@ -44,6 +48,9 @@ export async function insertOrder(params: InsertOrderParams): Promise<OrderWithM
   return {
     order: params.order,
     orderHash: params.orderHash,
+    secret: params.secret,
+    secretHash: params.secretHash,
+    extension: params.extension,
     status: params.status,
     createdAt: now,
     updatedAt: now,
@@ -108,6 +115,9 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
         dstEscrowAddress: order.destination_escrow || undefined
       } as Order,
       orderHash: order.order_hash,
+      secret: order.secret || undefined,
+      secretHash: order.secret_hash || undefined,
+      extension: order.extension || undefined,
       status: order.status as OrderStatus,
       createdAt: new Date(order.created_at),
       updatedAt: new Date(order.updated_at)
@@ -178,6 +188,9 @@ export async function updateOrderStatus(orderHash: string, newStatus: OrderStatu
       dstEscrowAddress: updatedOrder.destination_escrow || undefined
     } as Order,
     orderHash: updatedOrder.order_hash,
+    secret: updatedOrder.secret || undefined,
+    secretHash: updatedOrder.secret_hash || undefined,
+    extension: updatedOrder.extension || undefined,
     status: updatedOrder.status as OrderStatus,
     createdAt: new Date(updatedOrder.created_at),
     updatedAt: new Date(updatedOrder.updated_at)

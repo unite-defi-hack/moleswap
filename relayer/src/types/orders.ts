@@ -20,12 +20,26 @@ export interface Order {
 }
 
 /**
+ * Complete order with extension, secret, and secretHash
+ * This represents the full order data from 1inch cross-chain SDK
+ */
+export interface CompleteOrder {
+  order: Order;
+  extension: string;                // 1inch cross-chain extension data
+  signature: string;                // EIP-712 signature
+  secret: string;                   // User-generated secret
+  secretHash: string;               // Hash of the secret
+}
+
+/**
  * Order with metadata for database storage and API responses
  */
 export interface OrderWithMetadata {
   order: Order;
   orderHash: string;                // EIP-712 order hash
-  secret?: string;                  // Generated secret (encrypted)
+  secret?: string | undefined;      // Generated secret (encrypted)
+  secretHash?: string | undefined;  // Hash of the secret
+  extension?: string | undefined;   // 1inch cross-chain extension data
   status: OrderStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -134,6 +148,8 @@ export interface OrderRecord {
   destination_escrow: string;
   hashlock: string;
   secret?: string;
+  secret_hash?: string;
+  extension?: string;
   status: string;
   order_data: any;
   signed_data?: any;

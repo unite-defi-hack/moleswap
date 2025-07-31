@@ -76,92 +76,7 @@ export const orderSchema = Joi.object({
     })
 });
 
-// Order data request schema (for /api/orders/data endpoint)
-export const orderDataRequestSchema = Joi.object({
-  order: Joi.object({
-    maker: Joi.string()
-      .pattern(OrderValidationSchemas.maker)
-      .required()
-      .messages({
-        'string.pattern.base': 'Maker must be a valid Ethereum address',
-        'any.required': 'Maker address is required'
-      }),
-    makerAsset: Joi.string()
-      .pattern(OrderValidationSchemas.asset)
-      .required()
-      .messages({
-        'string.pattern.base': 'Maker asset must be a valid Ethereum address',
-        'any.required': 'Maker asset is required'
-      }),
-    takerAsset: Joi.string()
-      .pattern(OrderValidationSchemas.asset)
-      .required()
-      .messages({
-        'string.pattern.base': 'Taker asset must be a valid Ethereum address',
-        'any.required': 'Taker asset is required'
-      }),
-    makingAmount: Joi.string()
-      .pattern(OrderValidationSchemas.amount)
-      .min(1)
-      .max(78)
-      .required()
-      .messages({
-        'string.pattern.base': 'Making amount must be a valid number string',
-        'string.min': 'Making amount must be at least 1',
-        'string.max': 'Making amount exceeds maximum length',
-        'any.required': 'Making amount is required'
-      }),
-    takingAmount: Joi.string()
-      .pattern(OrderValidationSchemas.amount)
-      .min(1)
-      .max(78)
-      .required()
-      .messages({
-        'string.pattern.base': 'Taking amount must be a valid number string',
-        'string.min': 'Taking amount must be at least 1',
-        'string.max': 'Taking amount exceeds maximum length',
-        'any.required': 'Taking amount is required'
-      }),
-    receiver: Joi.string()
-      .pattern(OrderValidationSchemas.maker)
-      .default(OrderConstants.DEFAULT_RECEIVER)
-      .messages({
-        'string.pattern.base': 'Receiver must be a valid Ethereum address'
-      }),
-    
-    // Cross-chain specific fields (optional)
-    srcChainId: Joi.number()
-      .integer()
-      .min(1)
-      .optional()
-      .messages({
-        'number.base': 'Source chain ID must be a number',
-        'number.integer': 'Source chain ID must be an integer',
-        'number.min': 'Source chain ID must be positive'
-      }),
-    dstChainId: Joi.number()
-      .integer()
-      .min(1)
-      .optional()
-      .messages({
-        'number.base': 'Destination chain ID must be a number',
-        'number.integer': 'Destination chain ID must be an integer',
-        'number.min': 'Destination chain ID must be positive'
-      }),
-    srcEscrowAddress: Joi.string()
-      .pattern(OrderValidationSchemas.maker)
-      .optional()
-      .messages({
-        'string.pattern.base': 'Source escrow address must be a valid Ethereum address'
-      }),
-    dstEscrowAddress: Joi.string()
-      .pattern(OrderValidationSchemas.maker)
-      .optional()
-      .messages({
-        'string.pattern.base': 'Destination escrow address must be a valid Ethereum address'
-      })
-  }).required()
-});
+
 
 // Signed order schema (for /api/orders endpoint)
 export const signedOrderSchema = Joi.object({
@@ -181,6 +96,46 @@ export const signedOrderSchema = Joi.object({
 export const orderCreationRequestSchema = Joi.object({
   signedOrder: signedOrderSchema.required().messages({
     'any.required': 'Signed order is required'
+  })
+});
+
+// Complete order schema (for orders with extension, secret, and secretHash)
+export const completeOrderSchema = Joi.object({
+  order: orderSchema.required().messages({
+    'any.required': 'Order is required'
+  }),
+  extension: Joi.string()
+    .required()
+    .messages({
+      'any.required': 'Extension data is required'
+    }),
+  signature: Joi.string()
+    .pattern(OrderValidationSchemas.signature)
+    .required()
+    .messages({
+      'string.pattern.base': 'Signature must be a valid 65-byte hex string',
+      'any.required': 'Signature is required'
+    }),
+  secret: Joi.string()
+    .pattern(/^0x[a-fA-F0-9]{64}$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'Secret must be a valid 32-byte hex string',
+      'any.required': 'Secret is required'
+    }),
+  secretHash: Joi.string()
+    .pattern(/^0x[a-fA-F0-9]{64}$/)
+    .required()
+    .messages({
+      'string.pattern.base': 'Secret hash must be a valid 32-byte hex string',
+      'any.required': 'Secret hash is required'
+    })
+});
+
+// Complete order creation request schema
+export const completeOrderCreationRequestSchema = Joi.object({
+  completeOrder: completeOrderSchema.required().messages({
+    'any.required': 'Complete order is required'
   })
 });
 
@@ -382,39 +337,7 @@ export const validateSalt = (salt: string) => {
  * Validation helper functions
  */
 
-export const validateOrderData = (data: any) => {
-  const { error, value } = orderDataRequestSchema.validate(data, {
-    abortEarly: false,
-    stripUnknown: true
-  });
-  
-  if (error) {
-    return {
-      valid: false,
-      errors: error.details.map(detail => detail.message),
-      value: undefined
-    };
-  }
-  
-  // Additional custom validations
-  const amountValidation = validateAmounts(
-    value.order.makingAmount,
-    value.order.takingAmount
-  );
-  
-  const addressValidation = validateAddresses(value.order);
-  
-  const allErrors = [
-    ...(amountValidation.errors || []),
-    ...(addressValidation.errors || [])
-  ];
-  
-  return {
-    valid: allErrors.length === 0,
-    errors: allErrors,
-    value: allErrors.length === 0 ? value : undefined
-  };
-};
+
 
 export const validateSignedOrder = (data: any) => {
   const { error, value } = orderCreationRequestSchema.validate(data, {
@@ -537,5 +460,50 @@ export const validateOrderStatusUpdate = (data: any) => {
     valid: true,
     errors: [],
     value
+  };
+};
+
+export const validateCompleteOrder = (data: any) => {
+  const { error, value } = completeOrderCreationRequestSchema.validate(data, {
+    abortEarly: false,
+    stripUnknown: true
+  });
+  
+  if (error) {
+    return {
+      valid: false,
+      errors: error.details.map(detail => detail.message),
+      value: undefined
+    };
+  }
+  
+  // Additional custom validations
+  const amountValidation = validateAmounts(
+    value.completeOrder.order.makingAmount,
+    value.completeOrder.order.takingAmount
+  );
+  
+  const addressValidation = validateAddresses(value.completeOrder.order);
+  const saltValidation = validateSalt(value.completeOrder.order.salt);
+  
+  // Validate that secretHash matches the makerTraits (hashlock)
+  const secretHashValidation = {
+    valid: value.completeOrder.secretHash === value.completeOrder.order.makerTraits,
+    errors: value.completeOrder.secretHash !== value.completeOrder.order.makerTraits 
+      ? ['Secret hash must match the makerTraits (hashlock)'] 
+      : []
+  };
+  
+  const allErrors = [
+    ...(amountValidation.errors || []),
+    ...(addressValidation.errors || []),
+    ...(saltValidation.errors || []),
+    ...(secretHashValidation.errors || [])
+  ];
+  
+  return {
+    valid: allErrors.length === 0,
+    errors: allErrors,
+    value: allErrors.length === 0 ? value : undefined
   };
 }; 
