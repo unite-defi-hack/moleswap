@@ -16,7 +16,12 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "@1inch/cross-chain-sdk": "file:../1inch-cross-chain-sdk",
-    "@1inch/limit-order-sdk": "^4.0.0"
+    "@1inch/limit-order-sdk": "^4.0.0",
+    "wagmi": "^2.5.7",
+    "viem": "^2.7.9",
+    "@wagmi/core": "^2.5.7",
+    "@tanstack/react-query": "^5.17.9",
+    "@rainbow-me/rainbowkit": "^2.0.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
