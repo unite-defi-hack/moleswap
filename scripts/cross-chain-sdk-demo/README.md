@@ -10,7 +10,13 @@ pnpm install
 
 # Configure environment variables
 cp .env.example .env
-# Edit .env with your value for maker Private key
+# Edit .env with your value for:
+```
+MAKER_PRIV
+TAKER_PRIV
+RPC_URL
+TON_API_KEY
+TON_MNEMONIC
 ```
 
 ## Usage  
@@ -18,6 +24,9 @@ cp .env.example .env
 ```bash
 # Create cross-chain order
 tsx 1_order_create.tsx
+
+# Run order end to end between evm and ton
+tsx evm-to-ton-end-to-end.ts
 ```
 
 ## Configuration
