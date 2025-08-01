@@ -40,8 +40,11 @@ RELAYER_URL=http://localhost:3000 npx ts-node scripts/list-orders.ts
 - Demonstrates different filtering options:
   - By status (active, completed, cancelled, expired)
   - By asset address
+  - By source chain ID
+  - By destination chain ID
+  - By cross-chain pair (source → destination)
   - Pagination (small, medium, large)
-- Formatted output with clear order details
+- Formatted output with clear order details including chain information
 - Health check before operations
 - Comprehensive error handling
 
@@ -73,6 +76,14 @@ The `list-orders.ts` script includes hardcoded filter options for demonstration:
 - `usdc`: USDC token address
 - `weth`: Wrapped ETH address
 - `dai`: DAI token address
+
+### Chain ID Filters
+- `sepolia`: 11155111 (Sepolia testnet)
+- `baseSepolia`: 84532 (Base Sepolia testnet)
+- `ethereum`: 1 (Ethereum mainnet)
+- `polygon`: 137 (Polygon)
+- `arbitrum`: 42161 (Arbitrum One)
+- `optimism`: 10 (Optimism)
 
 ### Pagination Options
 - `small`: 10 orders per page

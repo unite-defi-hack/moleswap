@@ -23,6 +23,16 @@ const FILTER_OPTIONS = {
     dai: '0x6B175474E89094C44Da98b954EedeAC495271d0F'
   },
   
+  // Chain ID filters (from the order creation script)
+  chains: {
+    sepolia: 11155111,        // SEPOLIA_CHAIN_ID
+    baseSepolia: 84532,       // SEPOLIA_BASE_CHAIN_ID
+    ethereum: 1,              // Mainnet
+    polygon: 137,             // Polygon
+    arbitrum: 42161,          // Arbitrum One
+    optimism: 10              // Optimism
+  },
+  
   // Time ranges (in hours)
   timeRanges: {
     lastHour: 1,
@@ -48,6 +58,10 @@ interface Order {
   makingAmount: string;
   takingAmount: string;
   receiver: string;
+  srcChainId?: number;              // Source chain ID
+  dstChainId?: number;              // Destination chain ID
+  srcEscrowAddress?: string;        // Source escrow address
+  dstEscrowAddress?: string;        // Destination escrow address
 }
 
 interface OrderWithMetadata {
@@ -145,10 +159,74 @@ class RelayerClient {
       };
     }
   }
+
+  async getOrdersBySourceChain(srcChainId: number, limit: number = 50, offset: number = 0): Promise<GetOrdersResponse> {
+    try {
+      const response = await axios.get(`${this.baseURL}/api/orders?srcChainId=${srcChainId}&limit=${limit}&offset=${offset}`);
+      logger.info(`Retrieved ${response.data.data?.orders?.length || 0} orders for source chain: ${srcChainId}`);
+      return response.data;
+    } catch (error: any) {
+      logger.error('Failed to get orders by source chain:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: {
+          code: 'GET_ORDERS_BY_SOURCE_CHAIN_FAILED',
+          message: error.response?.data?.error?.message || error.message,
+          details: error.response?.data?.error?.details
+        }
+      };
+    }
+  }
+
+  async getOrdersByDestinationChain(dstChainId: number, limit: number = 50, offset: number = 0): Promise<GetOrdersResponse> {
+    try {
+      const response = await axios.get(`${this.baseURL}/api/orders?dstChainId=${dstChainId}&limit=${limit}&offset=${offset}`);
+      logger.info(`Retrieved ${response.data.data?.orders?.length || 0} orders for destination chain: ${dstChainId}`);
+      return response.data;
+    } catch (error: any) {
+      logger.error('Failed to get orders by destination chain:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: {
+          code: 'GET_ORDERS_BY_DESTINATION_CHAIN_FAILED',
+          message: error.response?.data?.error?.message || error.message,
+          details: error.response?.data?.error?.details
+        }
+      };
+    }
+  }
+
+  async getOrdersByChainPair(srcChainId: number, dstChainId: number, limit: number = 50, offset: number = 0): Promise<GetOrdersResponse> {
+    try {
+      const response = await axios.get(`${this.baseURL}/api/orders?srcChainId=${srcChainId}&dstChainId=${dstChainId}&limit=${limit}&offset=${offset}`);
+      logger.info(`Retrieved ${response.data.data?.orders?.length || 0} orders for chain pair: ${srcChainId} -> ${dstChainId}`);
+      return response.data;
+    } catch (error: any) {
+      logger.error('Failed to get orders by chain pair:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: {
+          code: 'GET_ORDERS_BY_CHAIN_PAIR_FAILED',
+          message: error.response?.data?.error?.message || error.message,
+          details: error.response?.data?.error?.details
+        }
+      };
+    }
+  }
 }
 
 function formatOrder(orderWithMetadata: OrderWithMetadata): string {
   const { order, orderHash, status, createdAt, updatedAt } = orderWithMetadata;
+  
+  // Format chain information
+  const chainInfo = [];
+  if (order.srcChainId) {
+    chainInfo.push(`Source: ${order.srcChainId}`);
+  }
+  if (order.dstChainId) {
+    chainInfo.push(`Destination: ${order.dstChainId}`);
+  }
+  const chainDisplay = chainInfo.length > 0 ? `\nChain IDs: ${chainInfo.join(' → ')}` : '';
   
   return `
 Order Hash: ${orderHash}
@@ -159,7 +237,7 @@ Taker Asset: ${order.takerAsset}
 Making Amount: ${order.makingAmount}
 Taking Amount: ${order.takingAmount}
 Receiver: ${order.receiver}
-Salt: ${order.salt}
+Salt: ${order.salt}${chainDisplay}
 Created: ${createdAt || 'N/A'}
 Updated: ${updatedAt || 'N/A'}
 Maker Traits: ${order.makerTraits}
@@ -262,18 +340,58 @@ async function main() {
     console.log('Failed to get orders with large pagination:', largePaginationOrders.error?.message);
   }
 
+  // Example 8: Orders from Sepolia (Source Chain)
+  console.log('\n📋 EXAMPLE 8: Orders from Sepolia (Source Chain)');
+  const sepoliaSourceOrders = await client.getOrdersBySourceChain(FILTER_OPTIONS.chains.sepolia);
+  if (sepoliaSourceOrders.success && sepoliaSourceOrders.data) {
+    displayOrders(sepoliaSourceOrders.data.orders, `Sepolia Source Orders (${sepoliaSourceOrders.data.total} total)`);
+  } else {
+    console.log('Failed to get Sepolia source orders:', sepoliaSourceOrders.error?.message);
+  }
+
+  // Example 9: Orders to Base Sepolia (Destination Chain)
+  console.log('\n📋 EXAMPLE 9: Orders to Base Sepolia (Destination Chain)');
+  const baseSepoliaDestOrders = await client.getOrdersByDestinationChain(FILTER_OPTIONS.chains.baseSepolia);
+  if (baseSepoliaDestOrders.success && baseSepoliaDestOrders.data) {
+    displayOrders(baseSepoliaDestOrders.data.orders, `Base Sepolia Destination Orders (${baseSepoliaDestOrders.data.total} total)`);
+  } else {
+    console.log('Failed to get Base Sepolia destination orders:', baseSepoliaDestOrders.error?.message);
+  }
+
+  // Example 10: Cross-chain orders (Sepolia -> Base Sepolia)
+  console.log('\n📋 EXAMPLE 10: Cross-Chain Orders (Sepolia -> Base Sepolia)');
+  const crossChainOrders = await client.getOrdersByChainPair(FILTER_OPTIONS.chains.sepolia, FILTER_OPTIONS.chains.baseSepolia);
+  if (crossChainOrders.success && crossChainOrders.data) {
+    displayOrders(crossChainOrders.data.orders, `Cross-Chain Orders: Sepolia -> Base Sepolia (${crossChainOrders.data.total} total)`);
+  } else {
+    console.log('Failed to get cross-chain orders:', crossChainOrders.error?.message);
+  }
+
+  // Example 11: Orders from Ethereum Mainnet
+  console.log('\n📋 EXAMPLE 11: Orders from Ethereum Mainnet');
+  const ethereumSourceOrders = await client.getOrdersBySourceChain(FILTER_OPTIONS.chains.ethereum);
+  if (ethereumSourceOrders.success && ethereumSourceOrders.data) {
+    displayOrders(ethereumSourceOrders.data.orders, `Ethereum Source Orders (${ethereumSourceOrders.data.total} total)`);
+  } else {
+    console.log('Failed to get Ethereum source orders:', ethereumSourceOrders.error?.message);
+  }
+
   // Summary
   console.log('\n📊 SUMMARY');
   console.log('='.repeat(50));
   console.log('Filter Options Available:');
   console.log(`- Status: ${Object.keys(FILTER_OPTIONS.status).join(', ')}`);
   console.log(`- Assets: ${Object.keys(FILTER_OPTIONS.assets).join(', ')}`);
+  console.log(`- Chains: ${Object.keys(FILTER_OPTIONS.chains).join(', ')}`);
   console.log(`- Time Ranges: ${Object.keys(FILTER_OPTIONS.timeRanges).join(', ')}`);
   console.log(`- Pagination: ${Object.keys(FILTER_OPTIONS.pagination).join(', ')}`);
   console.log('\nUsage Examples:');
   console.log('- Get all orders: client.getOrders()');
   console.log('- Get orders by status: client.getOrdersByStatus("active")');
   console.log('- Get orders by asset: client.getOrdersByAsset("0x...")');
+  console.log('- Get orders by source chain: client.getOrdersBySourceChain(11155111)');
+  console.log('- Get orders by destination chain: client.getOrdersByDestinationChain(84532)');
+  console.log('- Get cross-chain orders: client.getOrdersByChainPair(11155111, 84532)');
   console.log('- Pagination: client.getOrders(limit, offset)');
 
   logger.info('Order listing script completed successfully!');

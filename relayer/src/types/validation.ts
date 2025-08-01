@@ -166,6 +166,24 @@ export const orderQueryFiltersSchema = Joi.object({
     .messages({
       'string.pattern.base': 'Taker asset must be a valid Ethereum address'
     }),
+  srcChainId: Joi.number()
+    .integer()
+    .min(1)
+    .optional()
+    .messages({
+      'number.base': 'Source chain ID must be a number',
+      'number.integer': 'Source chain ID must be an integer',
+      'number.min': 'Source chain ID must be at least 1'
+    }),
+  dstChainId: Joi.number()
+    .integer()
+    .min(1)
+    .optional()
+    .messages({
+      'number.base': 'Destination chain ID must be a number',
+      'number.integer': 'Destination chain ID must be an integer',
+      'number.min': 'Destination chain ID must be at least 1'
+    }),
   limit: Joi.number()
     .integer()
     .min(1)

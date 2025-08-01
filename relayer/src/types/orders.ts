@@ -115,6 +115,8 @@ export interface OrderQueryFilters {
   maker?: string;
   makerAsset?: string;
   takerAsset?: string;
+  srcChainId?: number;              // Source chain ID filter
+  dstChainId?: number;              // Destination chain ID filter
   limit?: number;
   offset?: number;
 }

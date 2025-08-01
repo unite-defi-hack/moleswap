@@ -85,6 +85,15 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
     query = query.where({ taker_token: filters.takerAsset });
   }
   
+  // Chain ID filters
+  if (filters.srcChainId) {
+    query = query.where({ source_chain: filters.srcChainId.toString() });
+  }
+  
+  if (filters.dstChainId) {
+    query = query.where({ destination_chain: filters.dstChainId.toString() });
+  }
+  
   // Get total count for pagination
   const countQuery = query.clone();
   const totalResult = await countQuery.count('* as total').first();
