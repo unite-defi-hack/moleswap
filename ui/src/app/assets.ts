@@ -12,16 +12,16 @@ export const AVAILABLE_ASSETS: Asset[] = [
         symbol: 'TON',
         name: 'Toncoin',
         coinGeckoId: 'the-open-network',
-        network: 607, // TON_MAINNET
-        tokenAddress: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c', // TON native address
+        network: 608, // TON_TESTNET
+        tokenAddress: '0xda0000d4000015a526378bb6fafc650cea5966f8', // TRUE_ERC20 from deployments.ts
         icon: '/assets/ton.svg',
     },
     {
         symbol: 'ETH',
         name: 'Ethereum',
         coinGeckoId: 'ethereum',
-        network: 1, // ETHEREUM
-        tokenAddress: '0x0000000000000000000000000000000000000000', // ETH native address
+        network: 11155111, // Sepolia (Ethereum testnet)
+        tokenAddress: '0xda0000d4000015a526378bb6fafc650cea5966f8', // TRUE_ERC20 from deployments.ts
         icon: '/assets/ethereum.svg',
     },
 ];

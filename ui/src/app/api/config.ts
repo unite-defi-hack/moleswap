@@ -3,16 +3,16 @@
 
 export const ORDER_CONFIG = {
     // Chain IDs - these will be determined based on order direction
-    sourceChainId: 607, // TON_MAINNET
-    destinationChainId: 1, // Ethereum
+    sourceChainId: 608, // TON_TESTNET
+    destinationChainId: 11155111, // Sepolia (Ethereum testnet)
     
-    // Addresses (these would be fetched from environment or contract deployment)
-    escrowFactoryAddress: '0x0000000000000000000000000000000000000000', // Placeholder - should be actual deployed address
-    resolverProxyAddress: '0x0000000000000000000000000000000000000000', // Placeholder
+    // Addresses from the deployed contracts
+    escrowFactoryAddress: '0xa7bcb4eac8964306f9e3764f67db6a7af6ddf99a', // From deployments.ts
+    resolverProxyAddress: '0x1234567890123456789012345678901234567890', // Placeholder - needs actual deployment
     
     // Token addresses
-    tokenA: '0x0000000000000000000000000000000000000000', // TON native
-    tokenB: '0x0000000000000000000000000000000000000000', // ETH native
+    tokenA: '0xda0000d4000015a526378bb6fafc650cea5966f8', // TRUE_ERC20 from deployments.ts
+    tokenB: '0xda0000d4000015a526378bb6fafc650cea5966f8', // TRUE_ERC20 from deployments.ts
     
     // Safety deposits (in nano/wei)
     srcSafetyDeposit: '1000000000000',
