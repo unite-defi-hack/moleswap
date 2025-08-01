@@ -210,6 +210,19 @@ export class EvmAdapter {
     };
   }
 
+  async createDestinationEscrow(
+    order: EvmCrossChainOrder,
+    signature: string,
+    taker: Wallet,
+    fillAmount: bigint
+  ) {
+
+    
+
+
+
+  };
+
   /**
    * Patch order hash method to ensure consistency with maker's signature
    * This is needed so that when SDK serializes back order object it calculates
