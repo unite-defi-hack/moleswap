@@ -190,10 +190,9 @@ async function createTonDestinationEscrow(
     Extension.decode(evmOrderData.extension)
   );
 
-  const tonOrder = TonAdapter.transformEvmOrderToTon(
+  const tonOrder = TonAdapter.createEvmToTonOrderConfig(
     evmOrderData,
-    config.tonTakerAddress,
-    decodedOrder
+    decodedOrder.receiver.toString()
   );
 
   const destinationResult = await TonAdapter.createDestinationEscrow(
@@ -224,7 +223,7 @@ async function withdrawFromTonDstEscrow(orderData: {
 }): Promise<TonWithdrawalResult> {
   // Escrow address will be calculated automatically from order hash if not provided
 
-  const result = await TonAdapter.withdrawFromEscrow(orderData);
+  const result = await TonAdapter.withdrawFromDstEscrow(orderData);
 
   if (!result.success) {
     throw new Error(`TON withdrawal failed: ${result.error}`);

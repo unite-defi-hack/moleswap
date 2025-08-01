@@ -22,8 +22,8 @@ export interface MoleswapConfig {
   tokenB: string;
   // TON-specific configuration (testnet assumed)
   tonLopAddress: string;
-  tonTakerAddress: string;
-  tonMnemonic: string;
+  tonMakerMnemonic: string;
+  tonTakerMnemonic: string;
 }
 
 export function initMoleswapConfig(): MoleswapConfig {
@@ -41,8 +41,8 @@ export function initMoleswapConfig(): MoleswapConfig {
     tokenB: process.env.TOKEN_B!,
     // TON fields
     tonLopAddress: process.env.TON_LOP_ADDRESS!,
-    tonTakerAddress: process.env.TON_TAKER_ADDRESS!,
-    tonMnemonic: process.env.TON_MNEMONIC!,
+    tonMakerMnemonic: process.env.TON_MAKER_MNEMONIC!,
+    tonTakerMnemonic: process.env.TON_TAKER_MNEMONIC!,
   };
 
   validateConfig(config);
@@ -149,8 +149,8 @@ function validateConfig(config: MoleswapConfig): void {
     "tokenA",
     "tokenB",
     "tonLopAddress",
-    "tonTakerAddress", 
-    "tonMnemonic",
+    "tonMakerMnemonic",
+    "tonTakerMnemonic",
   ] as const;
 
   const missing = required.filter((key) => !config[key]);
@@ -223,18 +223,18 @@ function validateConfig(config: MoleswapConfig): void {
     );
   }
 
-  // Validate TON taker address (should be TON address format)
-  if (!isValidCrossChainAddress(config.tonTakerAddress)) {
-    throw new Error(
-      `Invalid TON_TAKER_ADDRESS: ${config.tonTakerAddress} (must be TON address format)`
-    );
-  }
-
   // Validate TON mnemonic (should be 24 words)
-  const mnemonicWords = config.tonMnemonic.trim().split(/\s+/);
+  const mnemonicWords = config.tonMakerMnemonic.trim().split(/\s+/);
   if (mnemonicWords.length !== 24) {
     throw new Error(
       `Invalid TON_MNEMONIC: must be exactly 24 words, got ${mnemonicWords.length}`
+    );
+  }
+
+  const mnemonicWordsTaker = config.tonTakerMnemonic.trim().split(/\s+/);
+  if (mnemonicWordsTaker.length !== 24) {
+    throw new Error(
+      `Invalid TON_TAKER_MNEMONIC: must be exactly 24 words, got ${mnemonicWordsTaker.length}`
     );
   }
 }

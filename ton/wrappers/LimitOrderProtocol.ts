@@ -145,7 +145,7 @@ export class LimitOrderProtocol implements Contract {
         return result.stack.readAddress();
     }
 
-    static calculateOrderHash(order: OrderConfig): bigint {
+    async calculateOrderHash(order: OrderConfig): Promise<bigint> {
         const orderData = beginCell()
             .storeAddress(order.maker_address as Address)
             .storeAddress(order.maker_asset as Address)
