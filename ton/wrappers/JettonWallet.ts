@@ -139,4 +139,53 @@ export class JettonWallet implements Contract {
             fwdMsg,
         );
     }
+
+    async sendFillOrder(
+        provider: ContractProvider,
+        via: Sender,
+        order: OrderConfig,
+        lopAddr: Address,
+        value: bigint = toNano(0.25),
+        fwdValue: bigint = toNano(0.18),
+        queryId: number = 0,
+    ) {
+        if (!via.address) {
+            throw Error('Sender address is not defined');
+        }
+        const fwdMsg = beginCell()
+            .storeUint(LopOp.fill_order, 32)
+            .storeUint(queryId, 64)
+            .storeUint(order.maker_address as bigint, 256)
+            .storeUint(order.maker_asset as bigint, 256)
+            .storeUint(order.making_amount, 128)
+            .storeAddress(order.receiver_address as Address)
+            .storeRef(
+                beginCell()
+                    .storeAddress(order.taker_address as Address)
+                    .storeAddress(order.taker_asset as Address)
+                    .storeCoins(order.taking_amount)
+                    .endCell(),
+            )
+            .storeRef(
+                beginCell()
+                    .storeUint(order.salt, 256)
+                    .storeUint(order.hashlock, 256)
+                    .storeUint(order.creation_time, 32)
+                    .storeUint(order.expiration_time, 32)
+                    .endCell(),
+            )
+            .endCell();
+
+        return await this.sendTransfer(
+            provider,
+            via,
+            value,
+            order.taking_amount,
+            lopAddr,
+            via.address,
+            null,
+            fwdValue,
+            fwdMsg,
+        );
+    }
 }

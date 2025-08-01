@@ -176,7 +176,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     }
 }
 
-(int) calculate_order_hash(
+(int) calculate_src_order_hash(
     slice maker_address,
     slice maker_asset,
     int making_amount,
@@ -197,6 +197,41 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
             begin_cell()
                 .store_uint(taker_asset, 256)
                 .store_uint(taking_amount, 128)
+                .end_cell()
+        )
+        .store_ref(
+            begin_cell()
+                .store_uint(hashlock, 256)
+                .store_uint(salt, 256)
+                .store_uint(creation_time, 32)
+                .store_uint(expiration_time, 32)
+                .end_cell()
+        )
+        .end_cell();
+    return cell_hash(order_data);
+}
+
+(int) calculate_dst_order_hash(
+    int maker_address,
+    int maker_asset,
+    int making_amount,
+    slice receiver_address,
+    slice taker_asset,
+    int taking_amount,
+    int hashlock,
+    int salt,
+    int creation_time,
+    int expiration_time
+) inline {
+    cell order_data = begin_cell()
+        .store_uint(maker_address, 256)
+        .store_uint(maker_asset, 256)
+        .store_uint(making_amount, 128)
+        .store_slice(receiver_address)
+        .store_ref(
+            begin_cell()
+                .store_slice(taker_asset)
+                .store_coins(taking_amount)
                 .end_cell()
         )
         .store_ref(
@@ -234,7 +269,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     ;; not used for now
     ;; slice maker_traits = in_msg_body~load_ref();
 
-    int order_hash = calculate_order_hash(
+    int order_hash = calculate_src_order_hash(
         maker_address,
         maker_asset,
         making_amount,
@@ -279,10 +314,23 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     slice receiver_address = cs~load_msg_addr();
 
     slice ds_auction = (cs~load_ref()).begin_parse();
-    int order_hash = ds_auction~load_uint(256);
+    int salt = ds_auction~load_uint(256);
     int hashlock = ds_auction~load_uint(256);
     int creation_time = ds_auction~load_uint(32);
     int expiration_time = ds_auction~load_uint(32);
+
+    int order_hash = calculate_dst_order_hash(
+        maker_address,
+        maker_asset,
+        making_amount,
+        receiver_address,
+        taker_asset,
+        taking_amount,
+        hashlock,
+        salt,
+        creation_time,
+        expiration_time
+    );
 
     create_dst_escrow(
         maker_address,
@@ -365,7 +413,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         }
 
         if (fwd_op == op::fill_order) {
-            slice ds_to = (in_msg_body~load_ref()).begin_parse();
+            slice ds_to = (fwd_cs~load_ref()).begin_parse();
             slice taker_address = ds_to~load_msg_addr();
             slice taker_asset = ds_to~load_msg_addr();
             int taking_amount = ds_to~load_coins();
@@ -375,7 +423,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
             throw_unless(error::invalid_asset_address, equal_slice_bits(sender_address, taker_asset));
             throw_unless(error::invalid_asset_address, ~ address::is_hole(taker_asset));
 
-            fill_order(taker_address, taker_asset, taking_amount, in_msg_body, sender_address, sender_address, query_id);
+            fill_order(taker_address, taker_asset, taking_amount, fwd_cs, sender_address, sender_address, query_id);
             return ();
         }
     }

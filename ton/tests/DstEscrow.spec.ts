@@ -50,6 +50,7 @@ describe('DstEscrow', () => {
         secret = generateRandomBigInt();
         order = {
             order_hash: generateRandomBigInt(),
+            salt: generateRandomBigInt(),
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),

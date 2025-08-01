@@ -62,8 +62,8 @@ describe('UserOrder', () => {
         };
 
         jettonMinter = await deployJettonMinter();
-        await mintJettons(maker.address, toNano(100));
-        await mintJettons(taker.address, toNano(100));
+        await mintJettons(maker.address, toNano(1000));
+        await mintJettons(taker.address, toNano(1000));
 
         lopSC = await deployLopSC();
 
@@ -88,7 +88,7 @@ describe('UserOrder', () => {
             taker_address: taker.address,
             taker_asset: HOLE_ADDRESS,
             taking_amount: toNano(200),
-            order_hash: generateRandomBigInt(),
+            salt: generateRandomBigInt(),
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
@@ -161,13 +161,28 @@ describe('UserOrder', () => {
             success: true,
         });
 
-        const orderHash = LimitOrderProtocol.calculateOrderHash(order);
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
+        return { result, orderHash };
+    }
+
+    async function fillOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+        const result = await lopSC.sendFillOrder(taker.getSender(), dstOrder);
+
+        expect(result.transactions).toHaveTransaction({
+            from: taker.address,
+            to: lopSC.address,
+            op: LopOp.fill_order,
+            success: true,
+        });
+
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
         return { result, orderHash };
     }
 
     async function createJettonOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
         const jettonWalletAddr = await jettonMinter.getWalletAddress(maker.address!!);
         const jettonWallet = blockchain.openContract(JettonWallet.createFromAddress(jettonWalletAddr));
+
         const result = await jettonWallet.sendCreateOrder(maker.getSender(), order, lopSC.address);
 
         expect(result.transactions).toHaveTransaction({
@@ -190,7 +205,37 @@ describe('UserOrder', () => {
             success: true,
         });
 
-        const orderHash = LimitOrderProtocol.calculateOrderHash(order);
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
+        return { result, orderHash };
+    }
+
+    async function fillJettonOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+        const jettonWalletAddr = await jettonMinter.getWalletAddress(taker.address!!);
+        const jettonWallet = blockchain.openContract(JettonWallet.createFromAddress(jettonWalletAddr));
+
+        const result = await jettonWallet.sendFillOrder(taker.getSender(), order, lopSC.address);
+
+        expect(result.transactions).toHaveTransaction({
+            from: taker.address,
+            to: jettonWalletAddr,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        const lopJettonWalletAddr = await jettonMinter.getWalletAddress(lopSC.address);
+        expect(result.transactions).toHaveTransaction({
+            from: jettonWalletAddr,
+            to: lopJettonWalletAddr,
+            op: JettonOp.internal_transfer,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: lopJettonWalletAddr,
+            to: lopSC.address,
+            op: JettonOp.transfer_notification,
+            success: true,
+        });
+
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
         return { result, orderHash };
     }
 
@@ -220,17 +265,10 @@ describe('UserOrder', () => {
     });
 
     it('taker should fill order successful', async () => {
-        const res = await lopSC.sendFillOrder(taker.getSender(), dstOrder);
+        const { result, orderHash } = await fillOrder(dstOrder);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
 
-        expect(res.transactions).toHaveTransaction({
-            from: taker.address,
-            to: lopSC.address,
-            op: LopOp.fill_order,
-            success: true,
-        });
-
-        const dstEscrowAddress = await lopSC.getDstEscrowAddress(dstOrder.order_hash!!);
-        expect(res.transactions).toHaveTransaction({
+        expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: dstEscrowAddress,
             op: EscrowOp.create,
@@ -239,7 +277,6 @@ describe('UserOrder', () => {
 
         const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrowAddress));
         const orderData = await dstEscrowSC.getEscrowData();
-        expect(orderData.orderHash).toEqual(dstOrder.order_hash!!);
         expect(orderData.hashlock).toEqual(dstOrder.hashlock);
         expect(orderData.creationTime).toEqual(dstOrder.creation_time);
         expect(orderData.expirationTime).toEqual(dstOrder.expiration_time);
@@ -275,6 +312,32 @@ describe('UserOrder', () => {
         expect(orderData.makerAssetAmount).toEqual(order.making_amount);
         expect(orderData.receiverAddress).toEqual(order.receiver_address);
         expect(orderData.takerAssetAddress).toEqual(order.taker_asset);
+        expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
+    });
+
+    it('fill existing order with jetton successful', async () => {
+        const order = { ...dstOrder, taker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const { result, orderHash } = await fillJettonOrder(order);
+
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        expect(result.transactions).toHaveTransaction({
+            from: lopSC.address,
+            to: dstEscrowAddress,
+            op: EscrowOp.create,
+            success: true,
+        });
+
+        const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrowAddress));
+        const orderData = await dstEscrowSC.getEscrowData();
+        expect(orderData.orderHash).toEqual(orderHash);
+        expect(orderData.hashlock).toEqual(order.hashlock);
+        expect(orderData.creationTime).toEqual(order.creation_time);
+        expect(orderData.expirationTime).toEqual(order.expiration_time);
+        expect(orderData.makerAddress).toEqual(order.maker_address);
+        expect(orderData.makerAssetAddress).toEqual(order.maker_asset);
+        expect(orderData.makerAssetAmount).toEqual(order.making_amount);
+        expect(orderData.receiverAddress.toString()).toEqual(order.receiver_address.toString());
+        expect(orderData.takerAssetAddress.toString()).toEqual(order.taker_asset.toString());
         expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
     });
 });
