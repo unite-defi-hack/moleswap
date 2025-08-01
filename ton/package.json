@@ -1,9 +1,18 @@
 {
-  "name": "ton_part",
+  "name": "moleswap-ton",
   "version": "0.0.1",
+  "main": "./wrappers/index.ts",
+  "types": "./wrappers/index.ts",
+  "exports": {
+    ".": "./wrappers/index.ts",
+    "./wrappers": "./wrappers/index.ts",
+    "./types": "./wrappers/types.ts",
+    "./opcodes": "./wrappers/opcodes.ts",
+    "./utils": "./wrappers/utils.ts"
+  },
   "scripts": {
     "start": "blueprint run",
-    "build": "blueprint build",
+    "build": "blueprint build", 
     "test": "jest --verbose",
     "lint": "prettier --write 'scripts/**/*' && prettier --write 'tests/**/*' && prettier --write 'wrappers/**'"
   },

@@ -9,15 +9,26 @@
     "order:deposit": "tsx 2_src_escrow.tsx",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["cross-chain", "1inch", "moleswap"],
+  "keywords": [
+    "cross-chain",
+    "1inch",
+    "moleswap"
+  ],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.10.0",
   "dependencies": {
     "@1inch/cross-chain-sdk": "file:../../1inch-cross-chain-sdk",
     "@1inch/limit-order-sdk": "^4.0.0",
+    "@ton/blueprint": "^0.38.0",
+    "@ton/core": "^0.61.0",
+    "@ton/crypto": "^3.3.0",
+    "@ton/ton": "^15.3.1",
     "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
+    "moleswap-ton": "file:../../ton"
+  },
+  "devDependencies": {
     "tsx": "^4.19.2"
   }
 }
