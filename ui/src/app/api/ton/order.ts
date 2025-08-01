@@ -6,7 +6,7 @@ import {
     Address as InchAddress,
     HashLock,
     TimeLocks,
-    EvmCrossChainOrder,
+    TonCrossChainOrder,
     AuctionDetails,
     EvmAddress,
     TonAddress,
@@ -44,8 +44,29 @@ export const createCrossChainOrder = async (
     fromAmount: number,
     toAsset: Asset,
     toAmount: number,
-    toAddress: string,
+    receiverAddress: string,
 ): Promise<CrossChainOrder> => {
+    // Determine order direction and chain IDs
+    const isTonToEth = fromAsset.network === 607; // TON to ETH
+    const isEthToTon = fromAsset.network === 1; // ETH to TON
+    
+    if (!isTonToEth && !isEthToTon) {
+        throw new Error('Unsupported order direction. Only TON ↔ ETH orders are supported.');
+    }
+    
+    // For TON to ETH orders, use TonCrossChainOrder (TON as source)
+    // For ETH to TON orders, use EvmCrossChainOrder (ETH as source)
+    const useTonOrder = isTonToEth;
+    const srcChainId = isTonToEth ? 607 : 1; // TON or ETH
+    const dstChainId = isTonToEth ? 1 : 607; // ETH or TON
+    
+    // Determine the correct address types based on order direction
+    const isReceiverAddressEvm = receiverAddress.startsWith('0x');
+    const isReceiverAddressTon = receiverAddress.startsWith('EQ') || receiverAddress.startsWith('UQ');
+    
+    if (!isReceiverAddressEvm && !isReceiverAddressTon) {
+        throw new Error('Invalid address format. Address must be either EVM (0x...) or TON (EQ.../UQ...) format.');
+    }
     // ----------------------------------------------------------------------------
     // 1. Secret & Hash-lock
     // ----------------------------------------------------------------------------
@@ -84,51 +105,107 @@ export const createCrossChainOrder = async (
 
     const nonce = randBigInt(UINT_40_MAX);
 
-    const order = EvmCrossChainOrder.new(
-        new EvmAddress(new InchAddress(ORDER_CONFIG.escrowFactoryAddress)),
-        {
-            makerAsset: new EvmAddress(new InchAddress(fromAsset.tokenAddress)),
-            takerAsset: TonAddress.NATIVE,
-            makingAmount: MAKING_AMOUNT,
-            takingAmount: TAKING_AMOUNT,
-            maker: new EvmAddress(new InchAddress(toAddress)),
-            receiver: new TonAddress("UQCVzWSLLWSRcex7lHcMnfnk3j4cCVHrNlVGQQSzE9L6FU13"),
-        },
-        {
-            hashLock,
-            srcChainId: ORDER_CONFIG.sourceChainId as any,
-            dstChainId: ORDER_CONFIG.destinationChainId as any,
-            srcSafetyDeposit: SRC_SAFETY_DEPOSIT,
-            dstSafetyDeposit: DST_SAFETY_DEPOSIT,
-            timeLocks
-        },
-        {
-            auction: auctionDetails,
-            whitelist: [
-                { address: new EvmAddress(new InchAddress(ORDER_CONFIG.resolverProxyAddress)), allowFrom: BigInt(0) },
-            ]
-        },
-        {
-            allowPartialFills: false,
-            allowMultipleFills: false,
-            nonce: nonce
+    let order;
+    
+    if (useTonOrder) {
+        // TON to ETH order using TonCrossChainOrder
+        // Get the user's TON wallet address
+        const tonWallet = tonConnect.account;
+        if (!tonWallet) {
+            throw new Error('TON wallet not connected');
         }
-    );
+        
+        order = TonCrossChainOrder.new(
+            {
+                makerAsset: TonAddress.NATIVE,
+                takerAsset: new EvmAddress(new InchAddress(toAsset.tokenAddress)),
+                makingAmount: MAKING_AMOUNT,
+                takingAmount: TAKING_AMOUNT,
+                maker: new TonAddress(tonWallet.address), // TON maker address from wallet
+                receiver: new EvmAddress(new InchAddress(receiverAddress)), // EVM receiver address
+            },
+            {
+                hashLock,
+                srcChainId: srcChainId as any,
+                dstChainId: dstChainId as any,
+                srcSafetyDeposit: SRC_SAFETY_DEPOSIT,
+                dstSafetyDeposit: DST_SAFETY_DEPOSIT,
+                timeLocks
+            },
+            {
+                auction: auctionDetails,
+            },
+            {
+                allowPartialFills: false,
+                allowMultipleFills: false,
+                srcAssetIsNative: true,
+            }
+        );
+    } else {
+        // ETH to TON order using EvmCrossChainOrder
+        // Note: In a real implementation, this would require an EVM wallet connection
+        // For now, we'll use a placeholder address
+        const { EvmCrossChainOrder } = await import('@1inch/cross-chain-sdk');
+        order = EvmCrossChainOrder.new(
+            new EvmAddress(new InchAddress(ORDER_CONFIG.escrowFactoryAddress)),
+            {
+                makerAsset: new EvmAddress(new InchAddress(fromAsset.tokenAddress)),
+                takerAsset: TonAddress.NATIVE,
+                makingAmount: MAKING_AMOUNT,
+                takingAmount: TAKING_AMOUNT,
+                maker: new EvmAddress(new InchAddress("0x58b9147c2411F97841b0b53c42777De5502D54c8")), // EVM maker address (placeholder)
+                receiver: new TonAddress(receiverAddress), // TON receiver address
+            },
+            {
+                hashLock,
+                srcChainId: srcChainId as any,
+                dstChainId: dstChainId as any,
+                srcSafetyDeposit: SRC_SAFETY_DEPOSIT,
+                dstSafetyDeposit: DST_SAFETY_DEPOSIT,
+                timeLocks
+            },
+            {
+                auction: auctionDetails,
+                whitelist: [
+                    { address: new EvmAddress(new InchAddress(ORDER_CONFIG.resolverProxyAddress)), allowFrom: BigInt(0) },
+                ]
+            },
+            {
+                allowPartialFills: false,
+                allowMultipleFills: false,
+                nonce: nonce
+            }
+        );
+    }
 
     // ----------------------------------------------------------------------------
     // 5. Sign the order (EIP-712)
     // ----------------------------------------------------------------------------
     // For now, we'll create a simple signature
     // In production, this would use proper EIP-712 signing with the user's wallet
-    const orderData = safeStringify(order.build());
+    let orderData, orderResult, extension;
+    
+    if (useTonOrder) {
+        // Handle TonCrossChainOrder
+        const tonOrder = order as any; // Type assertion for TonCrossChainOrder
+        orderData = safeStringify(tonOrder.toJSON());
+        orderResult = tonOrder.toJSON();
+        extension = tonOrder.getTonContractOrderHash().toString('hex');
+    } else {
+        // Handle EvmCrossChainOrder
+        const evmOrder = order as any; // Type assertion for EvmCrossChainOrder
+        orderData = safeStringify(evmOrder.build());
+        orderResult = evmOrder.build();
+        extension = evmOrder.extension.encode();
+    }
+    
     const signature = ethers.keccak256(ethers.toUtf8Bytes(orderData)).slice(0, 66); // Simple hash signature
-
-    const orderHash = order.getOrderHash(ORDER_CONFIG.sourceChainId);
+    const orderHash = order.getOrderHash(srcChainId);
     const expirationTime = new Date(Number(order.deadline) * 1000).toISOString();
 
     return {
-        order: order.build(),
-        extension: order.extension.encode(),
+        order: orderResult,
+        extension: extension,
         signature,
         secret,
         hashlock: secretHash,
@@ -144,7 +221,7 @@ export const createOrder = async (
     fromAmount: number,
     toAsset: Asset,
     toAmount: number,
-    toAddress: string,
+    receiverAddress: string,
 ) => {
     const crossChainOrder = await createCrossChainOrder(
         tonConnect,
@@ -152,7 +229,7 @@ export const createOrder = async (
         fromAmount,
         toAsset,
         toAmount,
-        toAddress
+        receiverAddress
     );
 
     console.log('Created cross-chain order:', crossChainOrder);
@@ -173,7 +250,7 @@ export const createOrder = async (
                         beginCell()
                             .storeUint(toAsset.network, 8)
                             .storeUint(ethAddressToBigInt(toAsset.tokenAddress), 256)
-                            .storeUint(ethAddressToBigInt(toAddress), 256)
+                            .storeUint(ethAddressToBigInt(receiverAddress), 256)
                             .storeUint(toAmount, 128)
                             .endCell(),
                     )

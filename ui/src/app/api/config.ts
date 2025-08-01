@@ -2,9 +2,9 @@
 // Following the structure from 1_order_create.ts
 
 export const ORDER_CONFIG = {
-    // Chain IDs
-    sourceChainId: 1, // TON
-    destinationChainId: 2, // Ethereum
+    // Chain IDs - these will be determined based on order direction
+    sourceChainId: 607, // TON_MAINNET
+    destinationChainId: 1, // Ethereum
     
     // Addresses (these would be fetched from environment or contract deployment)
     escrowFactoryAddress: '0x0000000000000000000000000000000000000000', // Placeholder - should be actual deployed address
