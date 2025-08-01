@@ -4,7 +4,9 @@ import { ethers } from 'ethers';
 import { Address } from '@ton/core';
 import { NetworkProvider } from '@ton/blueprint';
 import { LimitOrderProtocol } from '../wrappers/LimitOrderProtocol';
-import { ethAddressToBigInt, generateRandomBigInt } from '../wrappers/utils';
+import { JettonWallet } from '../wrappers/JettonWallet';
+import { JettonMinter } from '../wrappers/JettonMinter';
+import { ethAddressToBigInt, generateRandomBigInt, HOLE_ADDRESS } from '../wrappers/utils';
 import { OrderConfig } from '../wrappers/types';
 
 export async function run(provider: NetworkProvider, args: string[]) {
@@ -22,7 +24,17 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const order = await parseOrder(orderJsonPath);
     order.hashlock = BigInt(hashKey);
 
-    await lopSC.sendCreateOrder(provider.sender(), order);
+    if (order.maker_asset === HOLE_ADDRESS) {
+        await lopSC.sendCreateOrder(provider.sender(), order);
+    } else {
+        const lopJetton = provider.open(JettonWallet.createFromAddress(order.maker_asset as Address));
+        const { jettonMasterAddress } = await lopJetton.getWalletData();
+        const jettonMinter = provider.open(JettonMinter.createFromAddress(jettonMasterAddress));
+        const jettonWalletAddr = await jettonMinter.getWalletAddress(provider.sender().address as Address);
+        const jettonWallet = provider.open(JettonWallet.createFromAddress(jettonWalletAddr));
+
+        await jettonWallet.sendCreateOrder(provider.sender(), order, lopSC.address);
+    }
 
     ui.write('Order creation transaction was sent...');
 }

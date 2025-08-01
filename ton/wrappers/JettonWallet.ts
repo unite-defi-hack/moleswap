@@ -51,6 +51,19 @@ export class JettonWallet implements Contract {
         return res.stack.readBigNumber();
     }
 
+    async getWalletData(provider: ContractProvider) {
+        let state = await provider.getState();
+        if (state.state.type !== 'active') {
+            throw Error('Wallet is not active');
+        }
+        let res = await provider.get('get_wallet_data', []);
+        return {
+            balance: res.stack.readBigNumber(),
+            ownerAddress: res.stack.readAddress(),
+            jettonMasterAddress: res.stack.readAddress(),
+        };
+    }
+
     static transferMessage(
         jetton_amount: bigint,
         to: Address,
