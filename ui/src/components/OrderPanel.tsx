@@ -58,7 +58,7 @@ export const OrderPanel = () => {
                 parseFloat(payAmount),
                 receiveAsset,
                 parseFloat(receiveAmount),
-                '0x58b9147c2411F97841b0b53c42777De5502D54c8', // receiver address
+                '0x64547792e07633019347b8bC0D30F3dBd6aE975d', // receiver address
             );
 
             setCreatedOrder(order);

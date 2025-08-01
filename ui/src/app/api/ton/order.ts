@@ -3,7 +3,6 @@ import { Address, beginCell, toNano } from '@ton/core';
 import { CHAIN, TonConnectUI } from '@tonconnect/ui-react';
 import { ethers } from 'ethers';
 import {
-    Address as InchAddress,
     HashLock,
     TimeLocks,
     TonCrossChainOrder,
@@ -47,8 +46,8 @@ export const createCrossChainOrder = async (
     receiverAddress: string,
 ): Promise<CrossChainOrder> => {
     // Determine order direction and chain IDs
-    const isTonToEth = fromAsset.network === 607; // TON to ETH
-    const isEthToTon = fromAsset.network === 1; // ETH to TON
+    const isTonToEth = fromAsset.network === 608; // TON to ETH
+    const isEthToTon = fromAsset.network === 11155111; // ETH to TON
     
     if (!isTonToEth && !isEthToTon) {
         throw new Error('Unsupported order direction. Only TON ↔ ETH orders are supported.');
@@ -57,8 +56,8 @@ export const createCrossChainOrder = async (
     // For TON to ETH orders, use TonCrossChainOrder (TON as source)
     // For ETH to TON orders, use EvmCrossChainOrder (ETH as source)
     const useTonOrder = isTonToEth;
-    const srcChainId = isTonToEth ? 607 : 1; // TON or ETH
-    const dstChainId = isTonToEth ? 1 : 607; // ETH or TON
+    const srcChainId = isTonToEth ? 608 : 11155111; // TON or ETH
+    const dstChainId = isTonToEth ? 11155111 : 608; // ETH or TON
     
     // Determine the correct address types based on order direction
     const isReceiverAddressEvm = receiverAddress.startsWith('0x');
@@ -118,11 +117,11 @@ export const createCrossChainOrder = async (
         order = TonCrossChainOrder.new(
             {
                 makerAsset: TonAddress.NATIVE,
-                takerAsset: new EvmAddress(new InchAddress(toAsset.tokenAddress)),
+                takerAsset: EvmAddress.fromString(toAsset.tokenAddress),
                 makingAmount: MAKING_AMOUNT,
                 takingAmount: TAKING_AMOUNT,
                 maker: new TonAddress(tonWallet.address), // TON maker address from wallet
-                receiver: new EvmAddress(new InchAddress(receiverAddress)), // EVM receiver address
+                receiver: EvmAddress.fromString(receiverAddress), // EVM receiver address
             },
             {
                 hashLock,
@@ -147,13 +146,13 @@ export const createCrossChainOrder = async (
         // For now, we'll use a placeholder address
         const { EvmCrossChainOrder } = await import('@1inch/cross-chain-sdk');
         order = EvmCrossChainOrder.new(
-            new EvmAddress(new InchAddress(ORDER_CONFIG.escrowFactoryAddress)),
+            EvmAddress.fromString(ORDER_CONFIG.escrowFactoryAddress),
             {
-                makerAsset: new EvmAddress(new InchAddress(fromAsset.tokenAddress)),
+                makerAsset: EvmAddress.fromString(fromAsset.tokenAddress),
                 takerAsset: TonAddress.NATIVE,
                 makingAmount: MAKING_AMOUNT,
                 takingAmount: TAKING_AMOUNT,
-                maker: new EvmAddress(new InchAddress("0x58b9147c2411F97841b0b53c42777De5502D54c8")), // EVM maker address (placeholder)
+                maker: EvmAddress.fromString("0x58b9147c2411F97841b0b53c42777De5502D54c8"), // EVM maker address (placeholder)
                 receiver: new TonAddress(receiverAddress), // TON receiver address
             },
             {
@@ -167,7 +166,7 @@ export const createCrossChainOrder = async (
             {
                 auction: auctionDetails,
                 whitelist: [
-                    { address: new EvmAddress(new InchAddress(ORDER_CONFIG.resolverProxyAddress)), allowFrom: BigInt(0) },
+                    { address: EvmAddress.fromString(ORDER_CONFIG.resolverProxyAddress), allowFrom: BigInt(0) },
                 ]
             },
             {
