@@ -6,27 +6,29 @@ Demo scripts for Moleswap cross-chain order creation using the 1inch Cross-Chain
 
 ```bash
 # Install dependencies
-pnpm install
+cd moleswap/1inch-cross-chain-sdk && pnpm build
+cd moleswap/scripts/cross-chain-sdk-demo && pnpm install
 
 # Configure environment variables
 cp .env.example .env
 # Edit .env with your value for:
 ```
-MAKER_PRIV
-TAKER_PRIV
-RPC_URL
-TON_API_KEY
-TON_MNEMONIC
+TON_MAKER_MNEMONIC=
+TON_TAKER_MNEMONIC=
+TON_API_KEY=
+TAKER_PRIV=
+MAKER_PRIV=
+RPC_URL=
 ```
 
 ## Usage  
 
 ```bash
-# Create cross-chain order
-tsx 1_order_create.tsx
-
-# Run order end to end between evm and ton
+# Run swap end to end between evm and ton
 tsx evm-to-ton-end-to-end.ts
+
+# Run swap end to end between evm and ton
+tsx ton-to-evm-end-to-end.ts
 ```
 
 ## Configuration

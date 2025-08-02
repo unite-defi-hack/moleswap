@@ -11,11 +11,9 @@ import {
   TonCrossChainOrder,
 } from "@1inch/cross-chain-sdk";
 import { initMoleswapConfig, MoleswapConfig } from "./lib/config";
-import {
-  OrderConfig as MoleSwapTonToEvmOrder,
-} from "moleswap-ton";
-import { TonAdapter } from "./lib/tonAdapter";
-import { parseEther, parseUnits } from "ethers";
+import { TonAdapter, OrderConfig } from "./lib/tonAdapter";
+import { JsonRpcProvider, parseEther, parseUnits, toBeHex, Wallet, zeroPadValue } from "ethers";
+import { EvmAdapter } from "./lib/evmAdapter";
 
 const UINT_40_MAX = (1n << 40n) - 1n;
 
@@ -27,10 +25,8 @@ const safeBigInt = (val: string, fallback = 0n): bigint => {
   }
 };
 
-async function createOrder(
-  config: MoleswapConfig
-): Promise<{
-  orderData: MoleSwapTonToEvmOrder;
+async function createOrder(config: MoleswapConfig): Promise<{
+  order: TonCrossChainOrder;
   secret: string;
 }> {
   // ----------------------------------------------------------------------------
@@ -99,36 +95,71 @@ async function createOrder(
     }
   );
 
-  const tonToEvmOrderMoleSwap = await TonAdapter.createTonToEvmOrderConfig(tonOrderFusion);
-
   return {
-    orderData: tonToEvmOrderMoleSwap,
+    order: tonOrderFusion,
     secret: secret,
   };
 }
 
 async function main() {
   try {
-    // TON part of the order - Intent / Escrow / Withdrawal
     const config = initMoleswapConfig();
-    const { orderData, secret } = await createOrder(config);
+    const { order, secret } = await createOrder(config);
 
-    await TonAdapter.sendCreateOrder(orderData);
+    const moleSwapOrder = await TonAdapter.createTonToEvmOrderConfig(
+      order
+    );
 
-    const srcEscrowAddress = await TonAdapter.calculateSrcEscrowAddress(config.tonLopAddress, orderData.order_hash!);
-    console.log("Src escrow address (for debugging):", srcEscrowAddress);
-    await new Promise((resolve) => setTimeout(resolve, 10000)); // mine block
+    console.log("TON Create Order / SrcEscrow")
+    const createOrderResult = await TonAdapter.sendCreateOrder(moleSwapOrder);
+    console.log("TON Create Order / SrcEscrow Result:", createOrderResult)
 
-    await TonAdapter.claimOrder(orderData.order_hash!);
+    const srcEscrowAddress = await TonAdapter.calculateSrcEscrowAddress(config.tonLopAddress, moleSwapOrder.order_hash!);
+    console.log("TON SrcEscrow address:", srcEscrowAddress);
+    console.log("->>> Client should share order & secret with relayer at this point")
+    console.log("....Let's wait for one block to mine....")
+    await new Promise((resolve) => setTimeout(resolve, 10000)); // mine one block
 
-    await new Promise((resolve) => setTimeout(resolve, 26000)); // 36sec withdrawal timeout
+    console.log("TON Claim Order")
+    const claimOrderResult = await TonAdapter.claimOrder(moleSwapOrder.order_hash!);
+    console.log("TON Claim Order Result:", claimOrderResult)
 
-    await TonAdapter.withdrawFromSrcEscrow({
-      orderHash: orderData.order_hash!.toString(),
+    console.log("EVM Deploy DstEscrow")
+    const provider = new JsonRpcProvider(config.rpcUrl);
+    const taker = new Wallet(config.takerPrivateKey, provider);
+    const evmAdapter = new EvmAdapter(provider, config);
+    const { blockHash, transactionHash: deployEscrowTxHash } =
+      await evmAdapter.createDestinationEscrowFromOrder(
+        taker,
+        moleSwapOrder
+      );
+    console.log("EVM Deploy DstEscrow TX:", deployEscrowTxHash)
+
+    const hashLockHex = zeroPadValue(toBeHex(moleSwapOrder.hashlock.toString()), 32);
+    const { escrowAddress, blockTimestamp } = 
+      await evmAdapter.getEscrowAddressFromEvent(blockHash, hashLockHex);
+
+    console.log("EVM DstEscrow address:", escrowAddress)
+    console.log("....Let's pretend that finalty of blocks where escrows were deployed occured....")
+    console.log("---> Relay should share the secret with resolvers at this point")
+    console.log("TON Withdraw from SrcEscrow")
+
+    const withdrawFromSrcEscrowResult = await TonAdapter.withdrawFromSrcEscrow({
+      orderHash: moleSwapOrder.order_hash!.toString(),
       secret: secret,
     });
+    console.log("TON Withdraw from SrcEscrow Result:", withdrawFromSrcEscrowResult)
 
-    // EVM part of the order - TODO
+    console.log("EVM Withdraw from DstEscrow")
+    const { transactionHash: withdrawTxHash } =
+      await evmAdapter.withdrawFromDstEscrowWithOrder(
+        escrowAddress,
+        taker,
+        moleSwapOrder,
+        secret,
+        BigInt(blockTimestamp.toString())
+      );
+    console.log("EVM Withdraw from DstEscrow Result:", withdrawTxHash)
   } catch (error) {
     console.error("Error creating TON → EVM order:", error);
     process.exit(1);
