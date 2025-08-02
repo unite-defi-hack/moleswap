@@ -8,7 +8,6 @@
 
 #pragma version >=0.4.4;
 
-const storage_fee = 5000000; ;; 0.005 TON
 const exec_fee = 70000000;  ;; 0.07 TON
 const order_exec_fee = 30000000;  ;; 0.03 TON
 const reserve_fee = 1000000;  ;; 0.001 TON
@@ -26,6 +25,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     int hashlock,
     int creation_time,
     int expiration_time,
+    slice asset_jetton_address,
     slice excesses_addr,
     slice sender_address,
     int query_id
@@ -61,6 +61,11 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
             begin_cell()
                 .store_uint(taker_asset, 256)
                 .store_uint(taking_amount, 128)
+                .end_cell()
+        )
+        .store_ref(
+            begin_cell()
+                .store_slice(asset_jetton_address)
                 .end_cell()
         )
         .end_cell();
@@ -107,6 +112,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     int hashlock,
     int creation_time,
     int expiration_time,
+    slice asset_jetton_address,
     slice excesses_addr,
     slice sender_address,
     int query_id
@@ -144,6 +150,11 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
                 .store_coins(taking_amount)
                 .end_cell()
         )
+        .store_ref(
+            begin_cell()
+                .store_slice(asset_jetton_address)
+                .end_cell()
+        )
         .end_cell();
 
     if (address::is_hole(taker_asset)) {
@@ -164,10 +175,10 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         );
         send_jetton(
             to_contract_address,
-            making_amount,
+            taking_amount,
             sender_address,
             excesses_addr,
-            0,
+            min_security_deposit,
             null(),
             0,
             query_id,
@@ -266,6 +277,9 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     int creation_time = ds_to~load_uint(32);
     int expiration_time = ds_to~load_uint(32);
 
+    slice ds_jetton = (cs~load_ref()).begin_parse();
+    slice asset_jetton_address = ds_jetton~load_msg_addr();
+
     ;; not used for now
     ;; slice maker_traits = in_msg_body~load_ref();
 
@@ -293,6 +307,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         hashlock,
         creation_time,
         expiration_time,
+        asset_jetton_address,
         excesses_addr,
         sender_address,
         query_id
@@ -319,6 +334,9 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     int creation_time = ds_auction~load_uint(32);
     int expiration_time = ds_auction~load_uint(32);
 
+    slice ds_jetton = (cs~load_ref()).begin_parse();
+    slice asset_jetton_address = ds_jetton~load_msg_addr();
+
     int order_hash = calculate_dst_order_hash(
         maker_address,
         maker_asset,
@@ -344,6 +362,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         hashlock,
         creation_time,
         expiration_time,
+        asset_jetton_address,
         sender_address,
         sender_address,
         query_id

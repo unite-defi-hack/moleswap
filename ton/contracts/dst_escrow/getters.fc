@@ -1,7 +1,7 @@
 #include "../imports/stdlib.fc";
 #include "storage.fc";
 
-(slice, int, int, int, int, int, int, int, slice, slice, slice, int) get_escrow_data() method_id {
+(slice, int, int, int, int, int, int, int, slice, slice, slice, int, slice) get_escrow_data() method_id {
     load_data();
 
     return (
@@ -16,7 +16,8 @@
         storage::receiver_addr,
         storage::taker_addr,
         storage::taker_asset_addr,
-        storage::taker_asset_amount
+        storage::taker_asset_amount,
+        storage::asset_jetton_address
     );
 }
 

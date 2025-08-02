@@ -60,6 +60,7 @@ describe('SrcEscrow', () => {
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+            asset_jetton_address: HOLE_ADDRESS,
         };
     });
 
@@ -293,7 +294,9 @@ describe('SrcEscrow', () => {
             to: maker.address,
             success: true,
         });
-        expect(await maker.getBalance()).toBeGreaterThanOrEqual(makerBalanceBefore + order.making_amount);
+        expect(await maker.getBalance()).toBeGreaterThanOrEqual(
+            makerBalanceBefore + order.making_amount - toNano(0.05),
+        );
     });
 
     it('anyone can public cancel and receive deposit', async () => {

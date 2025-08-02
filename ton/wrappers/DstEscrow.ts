@@ -81,6 +81,11 @@ export class DstEscrow implements Contract {
                         .storeCoins(order.taking_amount)
                         .endCell(),
                 )
+                .storeRef(
+                    beginCell()
+                        .storeAddress(order.asset_jetton_address as Address)
+                        .endCell(),
+                )
                 .endCell(),
         });
     }
@@ -103,7 +108,7 @@ export class DstEscrow implements Contract {
         provider: ContractProvider,
         via: Sender,
         secret: bigint,
-        value: bigint = toNano(0.1),
+        value: bigint = toNano(0.05),
         query_id: number = 0,
     ) {
         await provider.internal(via, {

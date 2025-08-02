@@ -80,11 +80,16 @@ export class SrcEscrow implements Contract {
                         .storeUint(order.taking_amount, 128)
                         .endCell(),
                 )
+                .storeRef(
+                    beginCell()
+                        .storeAddress(order.asset_jetton_address as Address)
+                        .endCell(),
+                )
                 .endCell(),
         });
     }
 
-    async sendClaim(provider: ContractProvider, via: Sender, value: bigint = toNano('0.15'), query_id: number = 0) {
+    async sendClaim(provider: ContractProvider, via: Sender, value: bigint = toNano(0.16), query_id: number = 0) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
@@ -130,7 +135,7 @@ export class SrcEscrow implements Contract {
         provider: ContractProvider,
         via: Sender,
         secret: bigint,
-        value: bigint = toNano('0.05'),
+        value: bigint = toNano('0.1'),
         query_id: number = 0,
     ) {
         await provider.internal(via, {
@@ -144,7 +149,7 @@ export class SrcEscrow implements Contract {
         });
     }
 
-    async sendCancel(provider: ContractProvider, via: Sender, value: bigint = toNano('0.05'), query_id: number = 0) {
+    async sendCancel(provider: ContractProvider, via: Sender, value: bigint = toNano(0.05), query_id: number = 0) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
@@ -179,6 +184,7 @@ export class SrcEscrow implements Contract {
             receiverAddress: result.stack.readBigNumber(),
             takerAssetAddress: result.stack.readBigNumber(),
             takerAssetAmount: result.stack.readBigNumber(),
+            assetJettonAddress: result.stack.readAddress(),
         };
     }
 

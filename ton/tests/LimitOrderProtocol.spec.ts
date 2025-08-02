@@ -15,7 +15,7 @@ import { JettonWallet } from '../wrappers/JettonWallet';
 const HOUR = 1000 * 60 * 60;
 const DAY = 24 * HOUR;
 
-describe('UserOrder', () => {
+describe('Limit order protocol', () => {
     let blockchain: Blockchain;
 
     let limitOrderProtocolCode: Cell;
@@ -79,6 +79,7 @@ describe('UserOrder', () => {
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+            asset_jetton_address: HOLE_ADDRESS,
         };
         dstOrder = {
             maker_address: ethAddressToBigInt('0x1111111111111111111111111111111111111111'),
@@ -92,6 +93,7 @@ describe('UserOrder', () => {
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+            asset_jetton_address: HOLE_ADDRESS,
         };
     });
 
@@ -151,7 +153,7 @@ describe('UserOrder', () => {
         });
     }
 
-    async function createOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+    async function createOrder(order: OrderConfig): Promise<any> {
         const result = await lopSC.sendCreateOrder(maker.getSender(), order);
 
         expect(result.transactions).toHaveTransaction({
@@ -161,12 +163,11 @@ describe('UserOrder', () => {
             success: true,
         });
 
-        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
-        return { result, orderHash };
+        return result;
     }
 
-    async function fillOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
-        const result = await lopSC.sendFillOrder(taker.getSender(), dstOrder);
+    async function fillOrder(order: OrderConfig): Promise<any> {
+        const result = await lopSC.sendFillOrder(taker.getSender(), order);
 
         expect(result.transactions).toHaveTransaction({
             from: taker.address,
@@ -174,12 +175,10 @@ describe('UserOrder', () => {
             op: LopOp.fill_order,
             success: true,
         });
-
-        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
-        return { result, orderHash };
+        return result;
     }
 
-    async function createJettonOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+    async function createJettonOrder(order: OrderConfig): Promise<any> {
         const jettonWalletAddr = await jettonMinter.getWalletAddress(maker.address!!);
         const jettonWallet = blockchain.openContract(JettonWallet.createFromAddress(jettonWalletAddr));
 
@@ -205,11 +204,10 @@ describe('UserOrder', () => {
             success: true,
         });
 
-        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
-        return { result, orderHash };
+        return result;
     }
 
-    async function fillJettonOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+    async function fillJettonOrder(order: OrderConfig): Promise<any> {
         const jettonWalletAddr = await jettonMinter.getWalletAddress(taker.address!!);
         const jettonWallet = blockchain.openContract(JettonWallet.createFromAddress(jettonWalletAddr));
 
@@ -235,14 +233,14 @@ describe('UserOrder', () => {
             success: true,
         });
 
-        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
-        return { result, orderHash };
+        return result;
     }
 
     it('create a new order successful', async () => {
-        const { result, orderHash } = await createOrder(srcOrder);
-        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        const result = await createOrder(srcOrder);
 
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(srcOrder);
+        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: srcEscrowAddress,
@@ -262,12 +260,14 @@ describe('UserOrder', () => {
         expect(orderData.receiverAddress).toEqual(srcOrder.receiver_address);
         expect(orderData.takerAssetAddress).toEqual(srcOrder.taker_asset);
         expect(orderData.takerAssetAmount).toEqual(srcOrder.taking_amount);
+        expect(orderData.assetJettonAddress.toString()).toEqual(HOLE_ADDRESS.toString());
     });
 
     it('taker should fill order successful', async () => {
-        const { result, orderHash } = await fillOrder(dstOrder);
-        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        const result = await fillOrder(dstOrder);
 
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(dstOrder);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: dstEscrowAddress,
@@ -291,9 +291,12 @@ describe('UserOrder', () => {
 
     it('create a new order with jetton successful', async () => {
         const order = { ...srcOrder, maker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
-        const { result, orderHash } = await createJettonOrder(order);
-
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
         const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(srcEscrowAddress);
+
+        const result = await createJettonOrder(order);
+
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: srcEscrowAddress,
@@ -313,13 +316,17 @@ describe('UserOrder', () => {
         expect(orderData.receiverAddress).toEqual(order.receiver_address);
         expect(orderData.takerAssetAddress).toEqual(order.taker_asset);
         expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
+        expect(orderData.assetJettonAddress.toString()).toEqual(order.asset_jetton_address.toString());
     });
 
     it('fill existing order with jetton successful', async () => {
         const order = { ...dstOrder, taker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
-        const { result, orderHash } = await fillJettonOrder(order);
-
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
         const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(dstEscrowAddress);
+
+        const result = await fillJettonOrder(order);
+
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: dstEscrowAddress,
@@ -339,5 +346,328 @@ describe('UserOrder', () => {
         expect(orderData.receiverAddress.toString()).toEqual(order.receiver_address.toString());
         expect(orderData.takerAssetAddress.toString()).toEqual(order.taker_asset.toString());
         expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
+    });
+
+    it('taker should withdraw jettons from src escrow successful when know the secret', async () => {
+        const order = { ...srcOrder, maker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
+        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(srcEscrowAddress);
+
+        await createJettonOrder(order);
+
+        const takerWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(taker.address)),
+        );
+        const takerJettonBalanceBefore = await takerWallet.getJettonBalance();
+
+        const srcEscrowSC = blockchain.openContract(SrcEscrow.createFromAddress(srcEscrowAddress));
+        await srcEscrowSC.sendClaim(taker.getSender());
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.srcWithdrawal + 1;
+
+        const result = await srcEscrowSC.sendWithdraw(taker.getSender(), secret);
+
+        expect(result.transactions).toHaveTransaction({
+            from: taker.address,
+            to: srcEscrowSC.address,
+            op: EscrowOp.withdraw,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: srcEscrowSC.address,
+            to: order.asset_jetton_address,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: takerWallet.address,
+            to: taker.address,
+            op: JettonOp.transfer_notification,
+            success: true,
+        });
+        expect(await takerWallet.getJettonBalance()).toEqual(takerJettonBalanceBefore + order.making_amount);
+    });
+
+    it('taker should withdraw jettons to another address successful', async () => {
+        const takerReceiver = await blockchain.treasury('takerReceiver');
+        const order = { ...srcOrder, maker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
+        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(srcEscrowAddress);
+
+        await createJettonOrder(order);
+
+        const srcEscrowSC = blockchain.openContract(SrcEscrow.createFromAddress(srcEscrowAddress));
+        const takerWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(taker.address)),
+        );
+        const takerReceiverWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(takerReceiver.address)),
+        );
+        const takerJettonBalanceBefore = await takerWallet.getJettonBalance();
+        const takerReceiverJettonBalanceBefore = await takerReceiverWallet.getJettonBalance();
+
+        await srcEscrowSC.sendClaim(taker.getSender());
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.srcWithdrawal + 1;
+
+        const result = await srcEscrowSC.sendWithdrawTo(taker.getSender(), secret, takerReceiver.address);
+
+        expect(result.transactions).toHaveTransaction({
+            from: taker.address,
+            to: srcEscrowAddress,
+            op: EscrowOp.withdraw_to,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: srcEscrowAddress,
+            to: order.asset_jetton_address,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: takerReceiverWallet.address,
+            to: takerReceiver.address,
+            op: JettonOp.transfer_notification,
+            success: true,
+        });
+        expect(result.transactions).not.toHaveTransaction({
+            from: takerWallet.address,
+            to: taker.address,
+            op: JettonOp.transfer_notification,
+        });
+        expect(await takerWallet.getJettonBalance()).toEqual(takerJettonBalanceBefore);
+        expect(await takerReceiverWallet.getJettonBalance()).toEqual(
+            takerReceiverJettonBalanceBefore + order.making_amount,
+        );
+    });
+
+    it('anyone can make public withdraw jettonswhen know the secret', async () => {
+        const someUser = await blockchain.treasury('someUser');
+        const order = { ...srcOrder, maker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
+        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(srcEscrowAddress);
+
+        await createJettonOrder(order);
+
+        const srcEscrowSC = blockchain.openContract(SrcEscrow.createFromAddress(srcEscrowAddress));
+        await srcEscrowSC.sendClaim(taker.getSender());
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.srcPublicWithdrawal + 1;
+
+        const takerWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(taker.address)),
+        );
+        const takerJettonBalanceBefore = await takerWallet.getJettonBalance();
+        const userBalanceBefore = await someUser.getBalance();
+
+        const result = await srcEscrowSC.sendPublicWithdraw(someUser.getSender(), secret);
+
+        expect(result.transactions).toHaveTransaction({
+            from: someUser.address,
+            to: srcEscrowAddress,
+            op: EscrowOp.public_withdraw,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: srcEscrowAddress,
+            to: someUser.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: srcEscrowAddress,
+            to: order.asset_jetton_address,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        const deposit = toNano(0.1);
+        expect(await takerWallet.getJettonBalance()).toEqual(takerJettonBalanceBefore + order.making_amount);
+        expect(await someUser.getBalance()).toBeGreaterThanOrEqual(userBalanceBefore + deposit);
+    });
+
+    it('maker should cancel src escrow successful after expiration time and receive jettons back', async () => {
+        const order = { ...srcOrder, maker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
+        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(srcEscrowAddress);
+
+        await createJettonOrder(order);
+
+        const srcEscrowSC = blockchain.openContract(SrcEscrow.createFromAddress(srcEscrowAddress));
+        const makerWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(maker.address)),
+        );
+        const makerJettonBalanceBefore = await makerWallet.getJettonBalance();
+
+        await srcEscrowSC.sendClaim(taker.getSender());
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.srcCancellation + 1;
+
+        const result = await srcEscrowSC.sendCancel(maker.getSender());
+
+        expect(result.transactions).toHaveTransaction({
+            from: maker.address,
+            to: srcEscrowAddress,
+            op: EscrowOp.cancel,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: srcEscrowAddress,
+            to: order.asset_jetton_address,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: makerWallet.address,
+            to: maker.address,
+            op: JettonOp.transfer_notification,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: srcEscrowAddress,
+            to: taker.address,
+            success: true,
+        });
+        expect(await makerWallet.getJettonBalance()).toEqual(makerJettonBalanceBefore + order.making_amount);
+    });
+
+    it('anyone can public cancel and receive deposit, maker should receive jettons back', async () => {
+        const someUser = await blockchain.treasury('someUser');
+        const order = { ...srcOrder, maker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
+        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(srcEscrowAddress);
+
+        await createJettonOrder(order);
+
+        const srcEscrowSC = blockchain.openContract(SrcEscrow.createFromAddress(srcEscrowAddress));
+        const makerWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(maker.address)),
+        );
+        const makerJettonBalanceBefore = await makerWallet.getJettonBalance();
+        const userBalanceBefore = await someUser.getBalance();
+
+        await srcEscrowSC.sendClaim(taker.getSender());
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.srcPublicCancellation + 1;
+
+        const result = await srcEscrowSC.sendPublicCancel(someUser.getSender());
+
+        expect(result.transactions).toHaveTransaction({
+            from: someUser.address,
+            to: srcEscrowAddress,
+            op: EscrowOp.public_cancel,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: srcEscrowAddress,
+            to: someUser.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: srcEscrowAddress,
+            to: order.asset_jetton_address,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: makerWallet.address,
+            to: maker.address,
+            op: JettonOp.transfer_notification,
+            success: true,
+        });
+        const deposit = toNano(0.1);
+        expect(await makerWallet.getJettonBalance()).toEqual(makerJettonBalanceBefore + order.making_amount);
+        expect(await someUser.getBalance()).toBeGreaterThanOrEqual(userBalanceBefore + deposit);
+    });
+
+    it('maker should withdraw jettons from dst escrow successful when know the secret', async () => {
+        const order = { ...dstOrder, taker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(dstEscrowAddress);
+
+        await fillJettonOrder(order);
+
+        const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrowAddress));
+        const receiverWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(receiver.address)),
+        );
+        const receiverJettonBalanceBefore = await receiverWallet.getJettonBalance();
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.dstWithdrawal + 1;
+
+        const result = await dstEscrowSC.sendWithdraw(taker.getSender(), secret);
+
+        expect(result.transactions).toHaveTransaction({
+            from: taker.address,
+            to: dstEscrowAddress,
+            op: EscrowOp.withdraw,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: dstEscrowAddress,
+            to: order.asset_jetton_address,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: receiverWallet.address,
+            to: receiver.address,
+            op: JettonOp.transfer_notification,
+            success: true,
+        });
+        expect(await receiverWallet.getJettonBalance()).toEqual(receiverJettonBalanceBefore + order.taking_amount);
+    });
+
+    it('any user can make public withdraw jettons from dst escrow when know the secret', async () => {
+        const someUser = await blockchain.treasury('someUser');
+        const order = { ...dstOrder, taker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(dstEscrowAddress);
+
+        await fillJettonOrder(order);
+
+        const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrowAddress));
+        const receiverWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(receiver.address)),
+        );
+        const receiverJettonBalanceBefore = await receiverWallet.getJettonBalance();
+        const userBalanceBefore = await someUser.getBalance();
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.dstPublicWithdrawal + 1;
+
+        const result = await dstEscrowSC.sendPublicWithdraw(someUser.getSender(), secret);
+
+        expect(result.transactions).toHaveTransaction({
+            from: someUser.address,
+            to: dstEscrowAddress,
+            op: EscrowOp.public_withdraw,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: dstEscrowAddress,
+            to: someUser.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: dstEscrowAddress,
+            to: order.asset_jetton_address,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: receiverWallet.address,
+            to: receiver.address,
+            op: JettonOp.transfer_notification,
+            success: true,
+        });
+
+        const deposit = toNano(0.1);
+        expect(await receiverWallet.getJettonBalance()).toEqual(receiverJettonBalanceBefore + order.taking_amount);
+        expect(await someUser.getBalance()).toBeGreaterThanOrEqual(userBalanceBefore + deposit - toNano(0.02));
     });
 });

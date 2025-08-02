@@ -85,6 +85,11 @@ export class LimitOrderProtocol implements Contract {
                         .storeUint(order.expiration_time, 32)
                         .endCell(),
                 )
+                .storeRef(
+                    beginCell()
+                        .storeAddress(order.asset_jetton_address as Address)
+                        .endCell(),
+                )
                 .endCell(),
         });
     }
@@ -119,6 +124,11 @@ export class LimitOrderProtocol implements Contract {
                         .storeUint(order.hashlock, 256)
                         .storeUint(order.creation_time, 32)
                         .storeUint(order.expiration_time, 32)
+                        .endCell(),
+                )
+                .storeRef(
+                    beginCell()
+                        .storeAddress(order.asset_jetton_address as Address)
                         .endCell(),
                 )
                 .endCell(),
