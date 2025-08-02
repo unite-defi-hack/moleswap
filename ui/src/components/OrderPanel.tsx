@@ -7,8 +7,12 @@ import { Button } from './ui/Button';
 import { AVAILABLE_ASSETS, Asset } from '@/app/assets';
 import { createCrossChainOrder, CrossChainOrder } from '@/app/api/ton/order';
 import { useTonConnectUI } from '@tonconnect/ui-react';
+import { Address } from 'ton-core';
+
+import { useAccount, useSignTypedData } from 'wagmi';
 
 export const OrderPanel = () => {
+    const { address, isConnected } = useAccount();
     const [tonConnectUI] = useTonConnectUI();
     const [payAsset, setPayAsset] = useState<Asset>(AVAILABLE_ASSETS[0]);
     const [receiveAsset, setReceiveAsset] = useState<Asset>(AVAILABLE_ASSETS[1]);
@@ -17,6 +21,9 @@ export const OrderPanel = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [orderStep, setOrderStep] = useState<string>('');
     const [createdOrder, setCreatedOrder] = useState<CrossChainOrder | null>(null);
+
+    const { signTypedDataAsync } = useSignTypedData();
+
 
     const handleSwapAssets = () => {
         const tempAsset = payAsset;
@@ -51,6 +58,9 @@ export const OrderPanel = () => {
             setOrderStep('Signing the order...');
             await new Promise(resolve => setTimeout(resolve, 500));
 
+            console.log('55555 aaaaa', payAsset);
+            console.log('66666', tonConnectUI)
+
             // Step 5: Sign the order
             const order = await createCrossChainOrder(
                 tonConnectUI,
@@ -58,7 +68,8 @@ export const OrderPanel = () => {
                 parseFloat(payAmount),
                 receiveAsset,
                 parseFloat(receiveAmount),
-                '0x64547792e07633019347b8bC0D30F3dBd6aE975d', // receiver address
+                payAsset.name == 'Ethereum' ? Address.parse(tonConnectUI.account.address).toString({testOnly: true}) : address,
+                signTypedDataAsync
             );
 
             setCreatedOrder(order);

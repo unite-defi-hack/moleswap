@@ -25,6 +25,11 @@ import {
     safeStringify
 } from '../utils';
 import { ORDER_CONFIG } from '../config';
+import { signTypedData } from '@wagmi/core'
+import { createConfig, http } from '@wagmi/core'
+import { mainnet, sepolia } from '@wagmi/core/chains'
+
+
 
 const ESCROW_FACTORY = Address.parse('kQAU6TikP2x2EX35n1o1EV7TRRYBlUzUCwPmpz7wAt8NI3wo');
 
@@ -45,6 +50,7 @@ export const createCrossChainOrder = async (
     toAsset: Asset,
     toAmount: number,
     receiverAddress: string,
+    signTypedDataAsync: any,
 ): Promise<CrossChainOrder> => {
     // Determine order direction and chain IDs
     const isTonToEth = fromAsset.network === 608; // TON to ETH
@@ -81,13 +87,13 @@ export const createCrossChainOrder = async (
     // 2. Time-locks & Safety deposits (very short demo values)
     // ----------------------------------------------------------------------------
     const timeLocks = TimeLocks.new({
-        srcWithdrawal: BigInt(10),
+        srcWithdrawal: BigInt(0),
         srcPublicWithdrawal: BigInt(12000),
         srcCancellation: BigInt(18000),
         srcPublicCancellation: BigInt(24000),
-        dstWithdrawal: BigInt(10),
-        dstPublicWithdrawal: BigInt(120),
-        dstCancellation: BigInt(180)
+        dstWithdrawal: BigInt(0),
+        dstPublicWithdrawal: BigInt(600),
+        dstCancellation: BigInt(800)
     });
 
     const SRC_SAFETY_DEPOSIT = BigInt(ORDER_CONFIG.srcSafetyDeposit);
@@ -185,7 +191,8 @@ export const createCrossChainOrder = async (
     // For now, we'll create a simple signature
     // In production, this would use proper EIP-712 signing with the user's wallet
     let orderData, orderResult, extension;
-    
+    let signature;
+
     if (useTonOrder) {
         // Handle TonCrossChainOrder
         const tonOrder = order as any; // Type assertion for TonCrossChainOrder
@@ -198,9 +205,26 @@ export const createCrossChainOrder = async (
         orderData = safeStringify(evmOrder.build());
         orderResult = evmOrder.build();
         extension = evmOrder.extension.encode();
+
+        const config = createConfig({
+            chains: [sepolia],
+            transports: {
+                [sepolia.id]: http(),
+            },
+        })
+
+        const typedData = evmOrder.getTypedData(srcChainId);
+
+
+        signature = await signTypedDataAsync({
+            domain: typedData.domain,
+            types: { Order: typedData.types.Order },
+            primaryType: 'Order',
+            message: typedData.message,
+        });
     }
-    
-    const signature = ethers.keccak256(ethers.toUtf8Bytes(orderData)).slice(0, 66); // Simple hash signature
+
+
     const orderHash = order.getOrderHash(srcChainId);
     const expirationTime = new Date(Number(order.deadline) * 1000).toISOString();
 
