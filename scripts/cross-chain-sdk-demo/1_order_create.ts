@@ -13,7 +13,7 @@ import {
     EvmAddress,
     TonAddress,
 } from '@1inch/cross-chain-sdk'
-import {initMoleswapConfig, signOrderWithCustomLop} from './config'
+import {initMoleswapConfig, signOrderWithCustomLop} from './lib/config'
 
 const UINT_40_MAX = (1n << 40n) - 1n
 

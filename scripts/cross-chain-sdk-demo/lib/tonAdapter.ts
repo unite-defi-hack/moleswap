@@ -122,6 +122,7 @@ export class TonAdapter {
     });
     const walletContract = client.open(wallet);
 
+    console.log("Wallet address:", walletContract.address.toString());
     return { client, walletContract, key };
   }
 

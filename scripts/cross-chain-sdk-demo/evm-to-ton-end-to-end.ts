@@ -250,8 +250,11 @@ async function main() {
   await new Promise((resolve) => setTimeout(resolve, 10000));
   // resolver deposits to src escrow
   const depositResult = await depositToSrcEscrow(orderData, config);
+  console.log("Deposit to source escrow completed", depositResult);
+
   // resolver creates dst escrow
-  await createTonDestinationEscrow(orderData, config);
+  const tonDstEscrowResult = await createTonDestinationEscrow(orderData, config);
+  console.log("tonDstEscrowResult", tonDstEscrowResult)
 
   // relayer can follow up the escrows via
   // dst escrow address TON side - getDstEscrowAddressFromOrder()
@@ -264,13 +267,15 @@ async function main() {
 
   // at this point the relayer can share the secret with taker
   // taker withdraws from dst escrow
-  await withdrawFromTonDstEscrow({
+  const result = await withdrawFromTonDstEscrow({
     orderHash: orderData.orderHash,
     secret: orderData.secret,
   });
-  // taker withdraws from src escrow
-  await withdrawFromSrcEscrow(depositResult, orderData.secret, config);
+  console.log("Withdrawal from destination escrow completed", result);
 
+  // taker withdraws from src escrow
+  const res = await withdrawFromSrcEscrow(depositResult, orderData.secret, config);
+  console.log("WithdrawFromSrcEscrow result:", res);
   console.log("Withdrawals completed ");
 }
 
