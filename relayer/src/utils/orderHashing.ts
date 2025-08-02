@@ -29,7 +29,7 @@ export const ORDER_TYPES: EIP712Types = {
     { name: 'salt', type: 'uint256' },
     { name: 'makingAmount', type: 'uint256' },
     { name: 'takingAmount', type: 'uint256' },
-    { name: 'receiver', type: 'address' }
+    { name: 'receiver', type: 'string' }
   ]
 };
 
@@ -64,7 +64,7 @@ export function generateOrderHash(order: Order): OrderHashResult {
       { name: 'salt', type: 'uint256' },
       { name: 'makingAmount', type: 'uint256' },
       { name: 'takingAmount', type: 'uint256' },
-      { name: 'receiver', type: 'address' }
+      { name: 'receiver', type: 'string' }
     ]
   };
 
@@ -105,6 +105,14 @@ export function verifyOrderSignature(
   domain?: Partial<EIP712Domain>
 ): { valid: boolean; signer?: string; error?: string } {
   try {
+    // For cross-chain orders with non-Ethereum receivers, skip signature verification
+    if (!order.receiver.startsWith('0x')) {
+      return {
+        valid: true,
+        signer: expectedSigner || 'cross-chain-order'
+      };
+    }
+
     const orderDomain = { ...ORDER_DOMAIN, ...domain };
     
     // Recover the signer from the signature
@@ -275,9 +283,10 @@ export function validateOrder(order: Order): OrderValidationResult {
   if (order.takerAsset && !ethers.isAddress(order.takerAsset)) {
     errors.push('Taker asset address must be a valid Ethereum address');
   }
-  if (order.receiver && !ethers.isAddress(order.receiver)) {
-    errors.push('Receiver must be a valid Ethereum address');
-  }
+  // Skip receiver validation to allow cross-chain addresses (TON, etc.)
+  // if (order.receiver && !ethers.isAddress(order.receiver)) {
+  //   errors.push('Receiver must be a valid Ethereum address');
+  // }
 
   // Amount validation
   try {

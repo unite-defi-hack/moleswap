@@ -13,11 +13,11 @@ const REAL_ORDERS = [
     maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
     makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
     takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-    makerTraits: '62419173104490761595518734107500191045118193502286569769834485471068666462208',
+    makerTraits: '0x00bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b45350',
     salt: '8055219788148251265908589343240715975237002832007417457800707733977',
     makingAmount: '1000000000000000000',
     takingAmount: '2000000000000000000',
-    receiver: '0x0000000000000000000000000000000000000000'
+    receiver: '0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb'
   }
 ];
 
@@ -32,9 +32,9 @@ const COMPLETE_ORDERS = [
       salt: "8055219788148251265908589343240715975237002832007417457800707733977",
       makingAmount: "1000000000000000000",
       takingAmount: "2000000000000000000",
-      receiver: "0x0000000000000000000000000000000000000000"
+      receiver: "0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb"
     },
-    extension: "0x0000010f0000004a0000004a0000004a0000004a000000250000000000000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b688aa0008863b00397a9e212049500000800bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b453500000000000000000000000000000000000000000000000000000000000014a3400000000000000000000000010563e509b718a279de002dfc3e94a8a8f642b030000000000000000000000e8d4a510000000000000000000000000e8d4a5100000000000000000b4000000780000000a00005dc00000465000002ee00000000a",
+    extension: "0x0000010f0000004a0000004a0000004a0000004a000000250000000000000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b688aa0008863b00397a9e212049500000800bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b453500000000000000000000000000000000000000000000000000000000000014a3400000000000000000000000010563e509b718a279de002dfc3e94a8a8f642b03",
     signature: "", // Will be generated dynamically
     secret: "0x63b5eefdca0982721a0a673399bef816ee7522a9e77483d14466a666e859f3aa",
     secretHash: "0x00bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b45350"
@@ -148,7 +148,7 @@ class RelayerClient {
           { name: 'salt', type: 'uint256' },
           { name: 'makingAmount', type: 'uint256' },
           { name: 'takingAmount', type: 'uint256' },
-          { name: 'receiver', type: 'address' }
+          { name: 'receiver', type: 'string' }
         ]
       };
       
@@ -208,7 +208,7 @@ class RelayerClient {
           { name: 'salt', type: 'uint256' },
           { name: 'makingAmount', type: 'uint256' },
           { name: 'takingAmount', type: 'uint256' },
-          { name: 'receiver', type: 'address' }
+          { name: 'receiver', type: 'string' }
         ]
       };
       
@@ -315,47 +315,51 @@ async function main() {
   }
 
   // Create new orders
-  logger.info('Creating real orders...');
+  logger.info('Creating a single cross-chain order with proper TON receiver...');
   const createdOrders: string[] = [];
   
-  for (let i = 0; i < REAL_ORDERS.length; i++) {
-    const order = REAL_ORDERS[i];
-    if (!order) continue;
-    
-    logger.info(`Creating order ${i + 1}/${REAL_ORDERS.length}...`);
+  const order = REAL_ORDERS[0];
+  if (order) {
+    logger.info('Creating cross-chain order with TON receiver...');
     
     const result = await client.createOrder(order);
     if (result.success && result.data?.orderHash) {
       createdOrders.push(result.data.orderHash);
-      logger.info(`Order created with hash: ${result.data.orderHash}`);
+      logger.info(`Cross-chain order created with hash: ${result.data.orderHash}`);
+      logger.info(`Order details:`, {
+        maker: order.maker,
+        receiver: order.receiver,
+        makingAmount: order.makingAmount,
+        takingAmount: order.takingAmount
+      });
+      logger.info(`Using TON receiver address for cross-chain testing`);
     } else {
-      logger.error(`Failed to create order ${i + 1}:`, result.error);
+      logger.error(`Failed to create cross-chain order:`, result.error);
     }
-    
-    // Add a small delay between requests
-    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   // Create complete orders with extension, secret, and secretHash
-  logger.info('Creating complete orders with extension, secret, and secretHash...');
+  logger.info('Creating complete order with extension, secret, and secretHash...');
   const createdCompleteOrders: string[] = [];
   
-  for (let i = 0; i < COMPLETE_ORDERS.length; i++) {
-    const completeOrder = COMPLETE_ORDERS[i];
-    if (!completeOrder) continue;
-    
-    logger.info(`Creating complete order ${i + 1}/${COMPLETE_ORDERS.length}...`);
+  const completeOrder = COMPLETE_ORDERS[0];
+  if (completeOrder) {
+    logger.info('Creating complete cross-chain order with TON receiver...');
     
     const result = await client.createCompleteOrder(completeOrder);
     if (result.success && result.data?.orderHash) {
       createdCompleteOrders.push(result.data.orderHash);
-      logger.info(`Complete order created with hash: ${result.data.orderHash}`);
+      logger.info(`Complete cross-chain order created with hash: ${result.data.orderHash}`);
+      logger.info(`Complete order details:`, {
+        maker: completeOrder.order.maker,
+        receiver: completeOrder.order.receiver,
+        makingAmount: completeOrder.order.makingAmount,
+        takingAmount: completeOrder.order.takingAmount
+      });
+      logger.info(`Using TON receiver address for cross-chain testing`);
     } else {
-      logger.error(`Failed to create complete order ${i + 1}:`, result.error);
+      logger.error(`Failed to create complete cross-chain order:`, result.error);
     }
-    
-    // Add a small delay between requests
-    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
   // Test secret request with one of the created orders

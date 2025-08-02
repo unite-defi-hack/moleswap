@@ -70,10 +70,18 @@ export const orderSchema = Joi.object({
       'any.required': 'Taking amount is required'
     }),
   receiver: Joi.string()
-    .pattern(OrderValidationSchemas.maker)
+    .custom((value, helpers) => {
+      // Check if it's empty or the zero address
+      if (!value || value === '0x0000000000000000000000000000000000000000') {
+        return helpers.error('any.invalid');
+      }
+      
+      // Allow any non-empty, non-zero address format
+      return value;
+    })
     .default(OrderConstants.DEFAULT_RECEIVER)
     .messages({
-      'string.pattern.base': 'Receiver must be a valid Ethereum address'
+      'any.invalid': 'Receiver must be a valid non-zero address'
     })
 });
 
