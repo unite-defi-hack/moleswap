@@ -37,7 +37,9 @@
     "joi": "^17.11.0",
     "knex": "^3.0.1",
     "sqlite3": "^5.1.6",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "@1inch/cross-chain-sdk": "file:../1inch-cross-chain-sdk",
+    "@1inch/limit-order-sdk": "^4.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

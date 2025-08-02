@@ -3,65 +3,138 @@
 import axios from 'axios';
 import { ethers } from 'ethers';
 import { logger } from '../src/utils/logger';
+import { 
+  EvmCrossChainOrder, 
+  EvmAddress, 
+  TonAddress, 
+  HashLock, 
+  TimeLocks, 
+  AuctionDetails,
+  randBigInt,
+  Address
+} from '@1inch/cross-chain-sdk';
+import { randomBytes } from 'crypto';
+import { Wallet } from 'ethers';
 
 // Configuration
 const RELAYER_URL = process.env['RELAYER_URL'] || 'http://localhost:3000';
 
-// Function to generate unique salt
-function generateUniqueSalt(): string {
-  return (BigInt(Date.now()) + BigInt(Math.floor(Math.random() * 1000000))).toString();
-}
+const UINT_40_MAX = (1n << 40n) - 1n;
 
-// Function to generate unique secret
-function generateUniqueSecret(): string {
-  return "0x" + Buffer.from(require('crypto').randomBytes(32)).toString('hex');
-}
 
-// Function to generate unique secret hash
-function generateSecretHash(secret: string): string {
-  return ethers.keccak256(secret);
-}
 
-// Generate unique order data each time
-function generateUniqueOrders() {
-  const uniqueSalt = generateUniqueSalt();
-  const uniqueSecret = generateUniqueSecret();
-  const uniqueSecretHash = generateSecretHash(uniqueSecret);
+// Generate unique order data each time using proper Cross-Chain SDK
+async function generateUniqueOrders() {
+  // Create a test wallet for signing
+  const testWallet = new Wallet('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80');
   
-  const REAL_ORDERS = [
-    {
-      maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-      makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03', // EVM token address
-      takerAsset: '0x0000000000000000000000000000000000000000', // TON native token (placeholder for TON address)
-      makerTraits: uniqueSecretHash, // Use unique secret hash as makerTraits
-      salt: uniqueSalt,
-      makingAmount: '881220000000000', // 0.00088122 ETH, ~3.31$ (matching the example)
-      takingAmount: '200000000', // 0.2 TON (matching the example)
-      receiver: '0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb' // TON address format
-    }
-  ];
+  // 1. Secret & Hash-lock
+  const secretBytes = randomBytes(32);
+  const secret = "0x" + Buffer.from(secretBytes).toString("hex");
+  const hashLock = HashLock.forSingleFill(secret);
+  
+  // 2. Time-locks & Safety deposits
+  const timeLocks = TimeLocks.new({
+    srcWithdrawal: 0n,
+    srcPublicWithdrawal: 12000n,
+    srcCancellation: 18000n,
+    srcPublicCancellation: 24000n,
+    dstWithdrawal: 0n,
+    dstPublicWithdrawal: 120n,
+    dstCancellation: 180n,
+  });
 
-  // Complete order data with extension, secret, and secretHash
+  const SRC_SAFETY_DEPOSIT = 1000000000000n;
+  const DST_SAFETY_DEPOSIT = 1000000000000n;
+
+  // 3. Auction parameters (no auction - fixed price)
+  const auctionDetails = AuctionDetails.noAuction();
+
+  // 4. Build Cross-Chain Order
+  const MAKING_AMOUNT = 881220000000000n; // 0.00088122 ETH
+  const TAKING_AMOUNT = 200000000n; // 0.2 TON
+
+  const nonce = randBigInt(UINT_40_MAX);
+
+  const order = EvmCrossChainOrder.new(
+    new EvmAddress(new Address('0x0000000000000000000000000000000000000000')), // escrowFactoryAddress
+    {
+      makerAsset: new EvmAddress(new Address('0x10563e509b718a279de002dfc3e94a8a8f642b03')),
+      takerAsset: TonAddress.NATIVE,
+      makingAmount: MAKING_AMOUNT,
+      takingAmount: TAKING_AMOUNT,
+      maker: new EvmAddress(new Address(testWallet.address)),
+      receiver: new TonAddress("0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb"),
+    },
+    {
+      hashLock,
+      srcChainId: 1, // Ethereum mainnet
+      dstChainId: 608, // TON testnet
+      srcSafetyDeposit: SRC_SAFETY_DEPOSIT,
+      dstSafetyDeposit: DST_SAFETY_DEPOSIT,
+      timeLocks,
+    },
+    {
+      auction: auctionDetails,
+      whitelist: [
+        {
+          address: new EvmAddress(new Address('0x0000000000000000000000000000000000000000')), // resolverProxyAddress
+          allowFrom: 0n,
+        },
+      ],
+    },
+    {
+      allowPartialFills: false,
+      allowMultipleFills: false,
+      nonce: nonce,
+    }
+  );
+
+  // 5. Generate proper extension and signature
+  const extension = order.extension.encode();
+  
+  // Build the order and fix the makerTraits to use proper hex format
+  const builtOrder = order.build();
+  const fixedOrder = {
+    ...builtOrder,
+    maker: testWallet.address, // Ensure maker matches the signing wallet
+    makerTraits: hashLock.toString() // Use the proper hex format from hashLock
+  };
+  
+  // Create a proper EIP-712 signature
+  const domain = {
+    name: 'MoleSwap Relayer',
+    version: '1.0.0',
+    chainId: 1,
+    verifyingContract: '0x0000000000000000000000000000000000000000'
+  };
+  
+  const types = {
+    Order: [
+      { name: 'maker', type: 'address' },
+      { name: 'makerAsset', type: 'address' },
+      { name: 'takerAsset', type: 'address' },
+      { name: 'makerTraits', type: 'bytes32' },
+      { name: 'salt', type: 'uint256' },
+      { name: 'makingAmount', type: 'uint256' },
+      { name: 'takingAmount', type: 'uint256' },
+      { name: 'receiver', type: 'string' }
+    ]
+  };
+  
+  const signature = await testWallet.signTypedData(domain, types, fixedOrder);
+  
   const COMPLETE_ORDERS = [
     {
-      order: {
-        maker: "0x71078879cd9a1d7987b74cee6b6c0d130f1a0115",
-        makerAsset: "0x10563e509b718a279de002dfc3e94a8a8f642b03", // EVM token address
-        takerAsset: "0x0000000000000000000000000000000000000000", // TON native token (placeholder for TON address)
-        makerTraits: uniqueSecretHash, // Use unique secret hash as makerTraits
-        salt: uniqueSalt,
-        makingAmount: "881220000000000", // 0.00088122 ETH, ~3.31$ (matching the example)
-        takingAmount: "200000000", // 0.2 TON (matching the example)
-        receiver: "0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb" // TON address format
-      },
-      extension: "0x0000010f0000004a0000004a0000004a0000004a000000250000000000000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b688aa0008863b00397a9e212049500000800bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b453500000000000000000000000000000000000000000000000000000000000014a3400000000000000000000000010563e509b718a279de002dfc3e94a8a8f642b03",
-      signature: "", // Will be generated dynamically
-      secret: uniqueSecret,
-      secretHash: uniqueSecretHash
+      order: fixedOrder,
+      extension: extension,
+      signature: signature,
+      secret: secret,
+      secretHash: hashLock.toString()
     }
   ];
 
-  return { REAL_ORDERS, COMPLETE_ORDERS };
+  return { COMPLETE_ORDERS };
 }
 
 interface RealOrder {
@@ -78,7 +151,7 @@ interface RealOrder {
 interface CompleteOrder {
   order: RealOrder;
   extension: string;
-  signature: string;
+  signature: string | Promise<string>;
   secret: string;
   secretHash: string;
 }
@@ -214,45 +287,14 @@ class RelayerClient {
     try {
       logger.info('Creating complete order with extension, secret, and secretHash...');
       
-      // Generate a proper signature for the complete order
-      const domain = {
-        name: 'MoleSwap Relayer',
-        version: '1.0.0',
-        chainId: 1,
-        verifyingContract: '0x0000000000000000000000000000000000000000'
-      };
-      
-      const types = {
-        Order: [
-          { name: 'maker', type: 'address' },
-          { name: 'makerAsset', type: 'address' },
-          { name: 'takerAsset', type: 'address' },
-          { name: 'makerTraits', type: 'bytes32' },
-          { name: 'salt', type: 'uint256' },
-          { name: 'makingAmount', type: 'uint256' },
-          { name: 'takingAmount', type: 'uint256' },
-          { name: 'receiver', type: 'string' }
-        ]
-      };
-      
-      // Use a test private key that corresponds to the maker address
-      const testPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-      const testWallet = new ethers.Wallet(testPrivateKey);
-      
-      // Create a test order with the test wallet's address
-      const testCompleteOrder = {
-        ...completeOrder,
-        order: {
-          ...completeOrder.order,
-          maker: testWallet.address
-        }
-      };
-      
-      const signature = await testWallet.signTypedData(domain, types, testCompleteOrder.order);
+      // Handle async signature if needed
+      const signature = typeof completeOrder.signature === 'string' 
+        ? completeOrder.signature 
+        : await completeOrder.signature;
       
       const request: CreateCompleteOrderRequest = { 
         completeOrder: {
-          ...testCompleteOrder,
+          ...completeOrder,
           signature: signature
         }
       };
@@ -338,7 +380,7 @@ async function main() {
   }
 
   // Generate unique order for this run
-  const { COMPLETE_ORDERS } = generateUniqueOrders();
+  const { COMPLETE_ORDERS } = await generateUniqueOrders();
   
   // Create a single complete order
   logger.info('Creating a single complete EVM-to-TON cross-chain order...');
@@ -351,7 +393,14 @@ async function main() {
     logger.info(`Using unique secret: ${completeOrder.secret}`);
     logger.info(`Using unique secret hash: ${completeOrder.secretHash}`);
     
-    const result = await client.createCompleteOrder(completeOrder);
+    // Wait for the signature to be generated
+    const signature = await completeOrder.signature;
+    const orderWithSignature = {
+      ...completeOrder,
+      signature: signature
+    };
+    
+    const result = await client.createCompleteOrder(orderWithSignature);
     if (result.success && result.data?.orderHash) {
       createdCompleteOrders.push(result.data.orderHash);
       logger.info(`Complete EVM-to-TON cross-chain order created with hash: ${result.data.orderHash}`);

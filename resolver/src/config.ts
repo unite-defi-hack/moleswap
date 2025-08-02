@@ -56,7 +56,8 @@ export function loadConfig(): ResolverConfig {
       gasPrice: process.env.GAS_PRICE || 'auto',
       privateKey: process.env.TAKER_PRIV || '',
       rpcUrl: process.env.RPC_URL || 'http://localhost:8545',
-      chainId: parseInt(process.env.SOURCE_NETWORK_ID || '11155111')
+      chainId: parseInt(process.env.SOURCE_NETWORK_ID || '11155111'),
+      wallet: null as any // Will be initialized in ExecutionService constructor
     },
     oracle: {
       minProfitPercent: parseFloat(process.env.MIN_PROFIT_PERCENT || '1.0'),

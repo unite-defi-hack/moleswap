@@ -26,7 +26,8 @@
     "@ton/ton": "^15.3.1",
     "dotenv": "^17.2.1",
     "ethers": "^6.15.0",
-    "moleswap-ton": "file:../../ton"
+    "moleswap-ton": "file:../../ton",
+    "typescript": "^5.9.2"
   },
   "devDependencies": {
     "tsx": "^4.19.2"
