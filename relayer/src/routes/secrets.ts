@@ -14,6 +14,7 @@ import {
 
 import { EscrowValidationService } from '../services/escrowValidationService';
 import { validateSecretRequest } from '../types/validation';
+import { decryptSecret, getEncryptionKey } from '../utils/secretGeneration';
 
 const router = Router();
 
@@ -163,9 +164,35 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       return res.status(500).json(response);
     }
 
+    // Try to decrypt the secret if it's encrypted, otherwise use it as-is
+    let secret: string;
+    try {
+      // Check if the stored secret looks like it's encrypted (base64 format)
+      // Base64 strings don't start with 0x and contain only A-Z, a-z, 0-9, +, /, =
+      if (storedSecret.match(/^[A-Za-z0-9+/=]+$/) && !storedSecret.startsWith('0x')) {
+        // Looks like base64, try to decrypt it
+        const encryptionKey = getEncryptionKey();
+        secret = decryptSecret(storedSecret, encryptionKey);
+      } else {
+        // Not encrypted, use as-is (could be hex string or other format)
+        secret = storedSecret;
+      }
+    } catch (error) {
+      logger.error('Error processing secret:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.INVALID_SECRET_REQUEST,
+          message: 'Failed to process stored secret',
+          details: { orderHash }
+        }
+      };
+      return res.status(500).json(response);
+    }
+
     // Verify the secret matches the order's hashlock (makerTraits)
     const order = orderValidation.order!;
-    const expectedHash = ethers.keccak256(storedSecret);
+    const expectedHash = ethers.keccak256(secret);
     if (expectedHash !== order.hashlock) {
       logger.error('Stored secret does not match order hashlock', {
         orderHash,
@@ -188,7 +215,7 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
     const response: ApiResponse<SecretRequestResponse> = {
       success: true,
       data: {
-        secret: storedSecret,
+        secret: secret,
         orderHash,
         validationResult: {
           srcEscrow: {
@@ -208,7 +235,7 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       orderHash,
       srcEscrowAddress,
       dstEscrowAddress,
-      secretPrefix: storedSecret.slice(0, 10) + '...' // Log partial secret for security
+      secretPrefix: secret.slice(0, 10) + '...' // Log partial secret for security
     });
     
     return res.json(response);

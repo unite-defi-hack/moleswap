@@ -21,7 +21,6 @@ export {
 
 // Re-export validation functions
 export {
-  validateOrderData,
   validateSignedOrder,
   validateOrderQuery,
   validateSecretRequest,
