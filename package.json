@@ -2,11 +2,17 @@
   "name": "moleswap-monorepo",
   "private": true,
   "packageManager": "pnpm@10.10.0",
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
   "scripts": {
     "build": "pnpm --filter @1inch/cross-chain-sdk build && pnpm --filter ui build",
     "build:sdk": "pnpm --filter @1inch/cross-chain-sdk build",
     "build:ui": "pnpm --filter ui build",
-    "dev": "pnpm --filter ui dev",
+    "dev": "concurrently --kill-others-on-fail \"pnpm dev:sdk-watch\" \"pnpm dev:ui\"",
+    "dev:sdk-watch": "pnpm --filter @1inch/cross-chain-sdk dev",
+    "dev:ui": "pnpm --filter ui dev",
+    "dev:ui-only": "pnpm --filter ui dev",
     "install:all": "pnpm install",
     "postinstall": "pnpm build:sdk"
   },
