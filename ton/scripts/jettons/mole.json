@@ -1,6 +1,6 @@
 {
     "name": "Mole",
     "symbol": "MOLE",
-    "image": "https://raw.githubusercontent.com/refs/heads/main/unite-defi-hack/moleswap/scripts/jettons/mole.png",
+    "image": "https://raw.githubusercontent.com/unite-defi-hack/moleswap/refs/heads/main/ton/scripts/jettons/mole.png",
     "description": "Mole swap test jetton."
 }
