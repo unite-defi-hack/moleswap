@@ -428,5 +428,9 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         }
     }
 
+    if (op == op::excesses) {
+        return ();
+    }
+
     throw(0xffff);
 }
