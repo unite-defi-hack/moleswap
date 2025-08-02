@@ -53,6 +53,7 @@ export interface OrderWithMetadataResponse {
   orderHash: string;                // EIP-712 order hash
   secretHash?: string | undefined;  // Hash of the secret (safe to share)
   extension?: string | undefined;   // 1inch cross-chain extension data
+  signature?: string | undefined;   // EIP-712 signature
   status: OrderStatus;
   createdAt: Date;
   updatedAt: Date;

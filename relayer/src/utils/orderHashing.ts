@@ -13,7 +13,7 @@ import {
 export const ORDER_DOMAIN: EIP712Domain = {
   name: 'MoleSwap Relayer',
   version: '1.0.0',
-  chainId: 1, // Default to Ethereum mainnet, can be overridden
+  chainId: 11155111, // Default to Sepolia testnet, can be overridden
   verifyingContract: '0x0000000000000000000000000000000000000000' // Placeholder, should be set to actual contract
 };
 
@@ -50,7 +50,7 @@ export function generateOrderHash(order: Order): OrderHashResult {
   const domain: EIP712Domain = {
     name: 'MoleSwap Relayer',
     version: '1.0.0',
-    chainId: 1, // Default chain ID, can be overridden
+    chainId: 11155111, // Default chain ID, can be overridden
     verifyingContract: '0x0000000000000000000000000000000000000000' // Placeholder
   };
 
@@ -106,14 +106,86 @@ export function verifyOrderSignature(
 ): { valid: boolean; signer?: string; error?: string } {
   try {
     // For cross-chain orders with non-Ethereum receivers, skip signature verification
-    if (!order.receiver.startsWith('0x')) {
+    const isTonReceiver = order.receiver && !order.receiver.startsWith('0x');
+    const isTonTakerAsset = order.takerAsset && !order.takerAsset.startsWith('0x');
+    const isUint256MakerTraits = /^[0-9]{1,78}$/.test(order.makerTraits);
+
+    // If SDK format (TON address or uint256 decimal for makerTraits), use SDK EIP-712 domain/types/message
+    if (isTonReceiver || isTonTakerAsset || isUint256MakerTraits) {
+      // SDK EIP-712 domain/types/message
+      const sdkDomain = {
+        name: '1inch Limit Order Protocol',
+        version: '4',
+        chainId: 11155111, // Sepolia
+        verifyingContract: '0x991f286348580c1d2206843D5CfD7863Ff29eB15',
+      };
+      const sdkTypes = {
+        Order: [
+          { name: 'salt', type: 'uint256' },
+          { name: 'maker', type: 'address' },
+          { name: 'receiver', type: 'address' },
+          { name: 'makerAsset', type: 'address' },
+          { name: 'takerAsset', type: 'address' },
+          { name: 'makingAmount', type: 'uint256' },
+          { name: 'takingAmount', type: 'uint256' },
+          { name: 'makerTraits', type: 'uint256' },
+        ],
+      };
+      // Map receiver and takerAsset to EVM zero address if they are TON addresses (for signature recovery)
+      const message = {
+        salt: order.salt,
+        maker: order.maker,
+        receiver: order.receiver.startsWith('0x') ? order.receiver : '0x0000000000000000000000000000000000000000',
+        makerAsset: order.makerAsset.startsWith('0x') ? order.makerAsset : '0x0000000000000000000000000000000000000000',
+        takerAsset: order.takerAsset.startsWith('0x') ? order.takerAsset : '0x0000000000000000000000000000000000000000',
+        makingAmount: order.makingAmount,
+        takingAmount: order.takingAmount,
+        makerTraits: order.makerTraits,
+      };
+      const { logger } = require('./logger');
+      logger.info('🔍 SDK Signature verification debug:', {
+        order: JSON.stringify(order, null, 2),
+        domain: JSON.stringify(sdkDomain, null, 2),
+        types: JSON.stringify(sdkTypes, null, 2),
+        message: JSON.stringify(message, null, 2),
+        expectedSigner,
+        signature
+      });
+      const recoveredSigner = ethers.verifyTypedData(
+        sdkDomain,
+        sdkTypes,
+        message,
+        signature
+      );
+      logger.info('🔍 SDK Recovered signer:', { recoveredSigner });
+      if (expectedSigner) {
+        const expectedSignerLower = expectedSigner.toLowerCase();
+        const recoveredSignerLower = recoveredSigner.toLowerCase();
+        if (expectedSignerLower !== recoveredSignerLower) {
+          return {
+            valid: false,
+            signer: recoveredSigner,
+            error: `Signature verification failed. Expected: ${expectedSigner}, Got: ${recoveredSigner}`
+          };
+        }
+      }
       return {
         valid: true,
-        signer: expectedSigner || 'cross-chain-order'
+        signer: recoveredSigner
       };
     }
 
     const orderDomain = { ...ORDER_DOMAIN, ...domain };
+    
+    // Add debug logging
+    const { logger } = require('./logger');
+    logger.info('🔍 Signature verification debug:', {
+      order: JSON.stringify(order, null, 2),
+      domain: JSON.stringify(orderDomain, null, 2),
+      types: JSON.stringify(ORDER_TYPES, null, 2),
+      expectedSigner,
+      signature
+    });
     
     // Recover the signer from the signature
     const recoveredSigner = ethers.verifyTypedData(
@@ -122,6 +194,8 @@ export function verifyOrderSignature(
       order,
       signature
     );
+    
+    logger.info('🔍 Recovered signer:', { recoveredSigner });
     
     // If expected signer is provided, verify it matches
     if (expectedSigner) {

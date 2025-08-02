@@ -108,6 +108,8 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
   // Transform database records to OrderWithMetadataResponse format (includes secretHash but excludes secret)
   const transformedOrders: OrderWithMetadataResponse[] = orders.map(order => {
     const orderData = JSON.parse(order.order_data);
+    const signedData = order.signed_data ? JSON.parse(order.signed_data) : null;
+    
     return {
       order: {
         maker: order.maker,
@@ -126,6 +128,7 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
       orderHash: order.order_hash,
       secretHash: order.secret_hash || undefined,
       extension: order.extension || undefined,
+      signature: signedData?.signature || undefined,
       status: order.status as OrderStatus,
       createdAt: new Date(order.created_at),
       updatedAt: new Date(order.updated_at)

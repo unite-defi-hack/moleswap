@@ -6,34 +6,58 @@ import { verifySecretHashlock } from '../utils/secretGeneration';
  * Joi validation schemas for order-related requests
  */
 
+// Regex for EVM address
+const EVM_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
+// Regex for TON address (base64url, 48-52 chars)
+const TON_ADDRESS_REGEX = /^[A-Za-z0-9_-]{48,52}$/;
+// Regex for 32-byte hex string
+const HEX_32_REGEX = /^0x[a-fA-F0-9]{64}$/;
+// Regex for uint256 decimal string
+const UINT256_DEC_REGEX = /^[0-9]{1,78}$/;
+
 // Base order schema
 export const orderSchema = Joi.object({
   maker: Joi.string()
-    .pattern(OrderValidationSchemas.maker)
+    .pattern(EVM_ADDRESS_REGEX)
     .required()
     .messages({
       'string.pattern.base': 'Maker must be a valid Ethereum address',
       'any.required': 'Maker address is required'
     }),
   makerAsset: Joi.string()
-    .pattern(OrderValidationSchemas.asset)
+    .custom((value, helpers) => {
+      if (EVM_ADDRESS_REGEX.test(value) || TON_ADDRESS_REGEX.test(value)) {
+        return value;
+      }
+      return helpers.error('any.invalid');
+    })
     .required()
     .messages({
-      'string.pattern.base': 'Maker asset must be a valid Ethereum address',
+      'any.invalid': 'Maker asset must be a valid Ethereum or TON address',
       'any.required': 'Maker asset is required'
     }),
   takerAsset: Joi.string()
-    .pattern(OrderValidationSchemas.asset)
+    .custom((value, helpers) => {
+      if (EVM_ADDRESS_REGEX.test(value) || TON_ADDRESS_REGEX.test(value)) {
+        return value;
+      }
+      return helpers.error('any.invalid');
+    })
     .required()
     .messages({
-      'string.pattern.base': 'Taker asset must be a valid Ethereum address',
+      'any.invalid': 'Taker asset must be a valid Ethereum or TON address',
       'any.required': 'Taker asset is required'
     }),
   makerTraits: Joi.string()
-    .pattern(OrderValidationSchemas.hashlock)
+    .custom((value, helpers) => {
+      if (HEX_32_REGEX.test(value) || UINT256_DEC_REGEX.test(value)) {
+        return value;
+      }
+      return helpers.error('any.invalid');
+    })
     .required()
     .messages({
-      'string.pattern.base': 'Maker traits must be a valid 32-byte hex string',
+      'any.invalid': 'Maker traits must be a valid 32-byte hex string or uint256 decimal',
       'any.required': 'Maker traits (hashlock) is required'
     }),
   salt: Joi.string()
@@ -77,11 +101,14 @@ export const orderSchema = Joi.object({
       }
       
       // Allow any non-empty, non-zero address format
-      return value;
+      if (EVM_ADDRESS_REGEX.test(value) || TON_ADDRESS_REGEX.test(value)) {
+        return value;
+      }
+      return helpers.error('any.invalid');
     })
     .default(OrderConstants.DEFAULT_RECEIVER)
     .messages({
-      'any.invalid': 'Receiver must be a valid non-zero address'
+      'any.invalid': 'Receiver must be a valid non-zero Ethereum or TON address'
     })
 });
 
@@ -157,19 +184,19 @@ export const orderQueryFiltersSchema = Joi.object({
       'any.only': 'Status must be one of: pending, active, completed, cancelled'
     }),
   maker: Joi.string()
-    .pattern(OrderValidationSchemas.maker)
+    .pattern(EVM_ADDRESS_REGEX)
     .optional()
     .messages({
       'string.pattern.base': 'Maker must be a valid Ethereum address'
     }),
   makerAsset: Joi.string()
-    .pattern(OrderValidationSchemas.asset)
+    .pattern(EVM_ADDRESS_REGEX)
     .optional()
     .messages({
       'string.pattern.base': 'Maker asset must be a valid Ethereum address'
     }),
   takerAsset: Joi.string()
-    .pattern(OrderValidationSchemas.asset)
+    .pattern(EVM_ADDRESS_REGEX)
     .optional()
     .messages({
       'string.pattern.base': 'Taker asset must be a valid Ethereum address'
@@ -219,14 +246,14 @@ export const orderQueryFiltersSchema = Joi.object({
 // Secret request schema (for /api/secrets/:orderHash endpoint)
 export const secretRequestSchema = Joi.object({
   srcEscrowAddress: Joi.string()
-    .pattern(OrderValidationSchemas.maker)
+    .pattern(EVM_ADDRESS_REGEX)
     .required()
     .messages({
       'string.pattern.base': 'Source escrow address must be a valid Ethereum address',
       'any.required': 'Source escrow address is required'
     }),
   dstEscrowAddress: Joi.string()
-    .pattern(OrderValidationSchemas.maker)
+    .pattern(EVM_ADDRESS_REGEX)
     .required()
     .messages({
       'string.pattern.base': 'Destination escrow address must be a valid Ethereum address',

@@ -8,7 +8,8 @@
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "test": "jest",
-    "test:resolver": "ts-node src/test.ts",
+    "test:deposit-exact-maker": "ts-node src/test-deposit-exact-maker.ts",
+    "test:deposit": "ts-node src/test-deposit.ts",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist"
   },
@@ -18,7 +19,8 @@
     "dotenv": "^16.3.1",
     "winston": "^3.11.0",
     "crypto": "^1.0.1",
-    "@1inch/cross-chain-sdk": "file:../1inch-cross-chain-sdk"
+    "@1inch/cross-chain-sdk": "file:../1inch-cross-chain-sdk",
+    "@1inch/limit-order-sdk": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",

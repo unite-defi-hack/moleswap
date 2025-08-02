@@ -4,36 +4,55 @@ import axios from 'axios';
 import { ethers } from 'ethers';
 import { logger } from '../src/utils/logger';
 import { 
-  EvmCrossChainOrder, 
   EvmAddress, 
-  TonAddress, 
   HashLock, 
-  TimeLocks, 
-  AuctionDetails,
   randBigInt,
-  Address
+  Address,
+  TimeLocks,
+  EvmCrossChainOrder,
+  AuctionDetails,
+  TonAddress
 } from '@1inch/cross-chain-sdk';
 import { randomBytes } from 'crypto';
 import { Wallet } from 'ethers';
 
-// Configuration
+// Configuration - using the same as working example
 const RELAYER_URL = process.env['RELAYER_URL'] || 'http://localhost:3000';
-
 const UINT_40_MAX = (1n << 40n) - 1n;
 
+const safeBigInt = (val: string, fallback = 0n): bigint => {
+  try {
+    return val ? BigInt(val) : fallback;
+  } catch {
+    return fallback;
+  }
+};
 
-
-// Generate unique order data each time using proper Cross-Chain SDK
+// Generate unique order data each time using proper Cross-Chain SDK (EXACT same as working example)
 async function generateUniqueOrders() {
-  // Create a test wallet for signing
-  const testWallet = new Wallet('0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80');
+  // Use the EXACT same wallets as working example
+  const makerWallet = new Wallet('e9db769d24d997149156061e06424dce78968b6b9d2fef6ef9fbf701bdb3a331'); // Working example's maker
+  const takerWallet = new Wallet('7f8d1d2239ec86ad679c74f28afd032d94816eb0b0e43f48c71d4e52a86f7f85'); // Working example's taker
   
-  // 1. Secret & Hash-lock
+  logger.info(`👤 Maker wallet: ${makerWallet.address}`);
+  logger.info(`👤 Taker wallet: ${takerWallet.address}`);
+  
+  // ----------------------------------------------------------------------------
+  // 1. Secret & Hash-lock (EXACT same as working example)
+  // ----------------------------------------------------------------------------
   const secretBytes = randomBytes(32);
   const secret = "0x" + Buffer.from(secretBytes).toString("hex");
   const hashLock = HashLock.forSingleFill(secret);
+  const secretHash = hashLock.toString();
   
-  // 2. Time-locks & Safety deposits
+  logger.info(`🔐 Secret and hashlock created:`, {
+    secret: secret.substring(0, 20) + '...',
+    secretHash: secretHash
+  });
+
+  // ----------------------------------------------------------------------------
+  // 2. Time-locks & Safety deposits (EXACT same as working example)
+  // ----------------------------------------------------------------------------
   const timeLocks = TimeLocks.new({
     srcWithdrawal: 0n,
     srcPublicWithdrawal: 12000n,
@@ -44,32 +63,48 @@ async function generateUniqueOrders() {
     dstCancellation: 180n,
   });
 
-  const SRC_SAFETY_DEPOSIT = 1000000000000n;
-  const DST_SAFETY_DEPOSIT = 1000000000000n;
+  const SRC_SAFETY_DEPOSIT = safeBigInt("1000000000000");
+  const DST_SAFETY_DEPOSIT = safeBigInt("1000000000000");
 
-  // 3. Auction parameters (no auction - fixed price)
+  // ----------------------------------------------------------------------------
+  // 3. Auction parameters (EXACT same as working example)
+  // ----------------------------------------------------------------------------
   const auctionDetails = AuctionDetails.noAuction();
 
-  // 4. Build Cross-Chain Order
-  const MAKING_AMOUNT = 881220000000000n; // 0.00088122 ETH
-  const TAKING_AMOUNT = 200000000n; // 0.2 TON
+  // ----------------------------------------------------------------------------
+  // 4. Build Cross-Chain Order (EXACT same as working example)
+  // ----------------------------------------------------------------------------
+  const MAKING_AMOUNT = safeBigInt("881220000000000"); // 0.00088122 ETH, ~3.31$
+  const TAKING_AMOUNT = safeBigInt("200000000"); // 0.2 TON
 
   const nonce = randBigInt(UINT_40_MAX);
 
+  // Use EXACT same tokens as working example
+  const TOKEN_A = "0xa360725f46f43ad1b1aae09acfae96c2b59d1013"; // Working example's maker asset (EVM)
+  const TOKEN_B = TonAddress.NATIVE; // Working example's taker asset (TON)
+
+  // Configuration matching working example
+  const config = {
+    escrowFactoryAddress: "0x5e7854fC41247FD537FE45d7Ada070b9Bfba41DA",
+    sourceChainId: 11155111, // Sepolia
+    destinationChainId: 608, // TON testnet
+    resolverProxyAddress: "0xAa15bcf840eb0454C87710E6578E6C77Cd3DC402"
+  };
+
   const order = EvmCrossChainOrder.new(
-    new EvmAddress(new Address('0x0000000000000000000000000000000000000000')), // escrowFactoryAddress
+    new EvmAddress(new Address(config.escrowFactoryAddress)),
     {
-      makerAsset: new EvmAddress(new Address('0x10563e509b718a279de002dfc3e94a8a8f642b03')),
-      takerAsset: TonAddress.NATIVE,
+      makerAsset: new EvmAddress(new Address(TOKEN_A)),
+      takerAsset: TOKEN_B,
       makingAmount: MAKING_AMOUNT,
       takingAmount: TAKING_AMOUNT,
-      maker: new EvmAddress(new Address(testWallet.address)),
+      maker: new EvmAddress(new Address(makerWallet.address)),
       receiver: new TonAddress("0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb"),
     },
     {
       hashLock,
-      srcChainId: 1, // Ethereum mainnet
-      dstChainId: 608, // TON testnet
+      srcChainId: config.sourceChainId as unknown as any,
+      dstChainId: config.destinationChainId as unknown as any,
       srcSafetyDeposit: SRC_SAFETY_DEPOSIT,
       dstSafetyDeposit: DST_SAFETY_DEPOSIT,
       timeLocks,
@@ -78,7 +113,7 @@ async function generateUniqueOrders() {
       auction: auctionDetails,
       whitelist: [
         {
-          address: new EvmAddress(new Address('0x0000000000000000000000000000000000000000')), // resolverProxyAddress
+          address: new EvmAddress(new Address(config.resolverProxyAddress)),
           allowFrom: 0n,
         },
       ],
@@ -90,47 +125,49 @@ async function generateUniqueOrders() {
     }
   );
 
-  // 5. Generate proper extension and signature
-  const extension = order.extension.encode();
-  
-  // Build the order and fix the makerTraits to use proper hex format
-  const builtOrder = order.build();
-  const fixedOrder = {
-    ...builtOrder,
-    maker: testWallet.address, // Ensure maker matches the signing wallet
-    makerTraits: hashLock.toString() // Use the proper hex format from hashLock
+  logger.info(`📋 Order created with parameters:`, {
+    maker: order.maker.toString(),
+    makerAsset: order.makerAsset.toString(),
+    takerAsset: order.takerAsset.toString(),
+    makingAmount: order.makingAmount.toString(),
+    takingAmount: order.takingAmount.toString(),
+    receiver: order.receiver.toString()
+  });
+
+  // Use SDK's order.build() output for the payload
+  const orderData = order.build();
+
+  // Use SDK's EIP-712 domain/types/message for signing
+  const typedData = order.getTypedData(config.sourceChainId);
+  const signature = await makerWallet.signTypedData(
+    typedData.domain,
+    { Order: typedData.types['Order'] as any },
+    typedData.message
+  );
+  const orderHash = order.getOrderHash(config.sourceChainId);
+
+  const output = {
+    order: orderData,
+    extension: order.extension.encode(),
+    signature,
+    secret,
+    hashlock: orderData.makerTraits, // Use the uint256 string for hashlock
+    orderHash: orderHash,
+    expirationTime: new Date(Number(order.deadline) * 1000).toISOString(),
   };
-  
-  // Create a proper EIP-712 signature
-  const domain = {
-    name: 'MoleSwap Relayer',
-    version: '1.0.0',
-    chainId: 1,
-    verifyingContract: '0x0000000000000000000000000000000000000000'
-  };
-  
-  const types = {
-    Order: [
-      { name: 'maker', type: 'address' },
-      { name: 'makerAsset', type: 'address' },
-      { name: 'takerAsset', type: 'address' },
-      { name: 'makerTraits', type: 'bytes32' },
-      { name: 'salt', type: 'uint256' },
-      { name: 'makingAmount', type: 'uint256' },
-      { name: 'takingAmount', type: 'uint256' },
-      { name: 'receiver', type: 'string' }
-    ]
-  };
-  
-  const signature = await testWallet.signTypedData(domain, types, fixedOrder);
+
+  logger.info(`✍️ Order signed successfully:`, {
+    orderHash: output.orderHash,
+    signature: signature.substring(0, 20) + '...'
+  });
   
   const COMPLETE_ORDERS = [
     {
-      order: fixedOrder,
-      extension: extension,
-      signature: signature,
-      secret: secret,
-      secretHash: hashLock.toString()
+      order: output.order,
+      extension: output.extension,
+      signature: output.signature,
+      secret: output.secret,
+      secretHash: output.hashlock
     }
   ];
 
@@ -231,7 +268,7 @@ class RelayerClient {
       const domain = {
         name: 'MoleSwap Relayer',
         version: '1.0.0',
-        chainId: 1,
+        chainId: 11155111,
         verifyingContract: '0x0000000000000000000000000000000000000000'
       };
       

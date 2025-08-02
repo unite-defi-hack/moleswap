@@ -17,7 +17,7 @@ async function testResolver() {
     const executionService = new ExecutionService(config.execution, relayerService, config);
     
     // Initialize resolver
-    const resolver = new ResolverService(relayerService, oracleService, executionService);
+    const resolver = new ResolverService(relayerService, oracleService, executionService, config);
 
     console.log('✅ Services initialized successfully');
 
@@ -87,6 +87,10 @@ async function testResolver() {
     console.log('\n📊 Resolver Statistics:');
     resolver.printStats();
 
+    // Test depositToSrcEscrow method
+    console.log('\n🔍 Testing depositToSrcEscrow...');
+    await testDepositToSrcEscrow(executionService);
+
     console.log('\n✅ All tests completed successfully!');
     console.log('\nTo start the full resolver service:');
     console.log('npm start');
@@ -99,6 +103,55 @@ async function testResolver() {
 // Run the test
 if (require.main === module) {
   testResolver().catch(console.error);
+}
+
+async function testDepositToSrcEscrow(executionService: ExecutionService) {
+  console.log('Testing depositToSrcEscrow method...');
+  
+  // Create a mock order with complete data (including extension and signature)
+  const mockOrder = {
+    maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
+    makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
+    takerAsset: '0x0000000000000000000000000000000000000000',
+    makerTraits: '0x1234567890123456789012345678901234567890123456789012345678901234', // mock hashlock
+    salt: '123456789',
+    makingAmount: '881220000000000',
+    takingAmount: '200000000',
+    receiver: '0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb',
+    // Add the required fields for EVM adapter
+    extension: '', // Empty extension to test fallback
+    signature: '', // Empty signature to test fallback
+  };
+
+  const orderHash = '0x1234567890123456789012345678901234567890123456789012345678901234';
+  
+  try {
+    console.log('Mock order data:', {
+      maker: mockOrder.maker,
+      makerAsset: mockOrder.makerAsset,
+      takerAsset: mockOrder.takerAsset,
+      makingAmount: mockOrder.makingAmount,
+      takingAmount: mockOrder.takingAmount,
+      receiver: mockOrder.receiver,
+      makerTraits: mockOrder.makerTraits,
+      extension: mockOrder.extension ? 'present' : 'missing',
+      signature: mockOrder.signature ? 'present' : 'missing',
+    });
+
+    // Call the depositToSrcEscrow method
+    const result = await (executionService as any).depositToSrcEscrow(mockOrder, orderHash);
+    
+    console.log('✅ depositToSrcEscrow completed successfully!');
+    console.log('Result:', {
+      escrowAddress: result.escrowAddress,
+      transactionHash: result.transactionHash,
+      blockHash: result.blockHash,
+      blockTimestamp: result.blockTimestamp,
+    });
+    
+  } catch (error) {
+    console.error('❌ depositToSrcEscrow failed:', error);
+  }
 }
 
 export { testResolver }; 

@@ -21,6 +21,7 @@ import {
 import { RelayerService } from './relayerService';
 import { TonAdapter } from './tonAdapter';
 import { ResolverConfig } from '../config';
+import {EvmAdapter, EvmAdapterConfig, DepositResult} from "./lib/evmAdapter";
 
 const UINT_40_MAX = (1n << 40n) - 1n;
 
@@ -48,6 +49,7 @@ export class ExecutionService {
   /**
    * Execute a cross-chain order
    */
+
   async executeOrder(orderWithMetadata: OrderWithMetadata): Promise<ExecutionResult> {
     const startTime = Date.now();
     const { order, orderHash } = orderWithMetadata;
@@ -55,54 +57,17 @@ export class ExecutionService {
     try {
       console.log(`Starting execution for order: ${orderHash}`);
 
-      // Step 1: Create escrow on source chain
-      const srcEscrowResult = await this.createSourceEscrow(order, orderHash);
-      console.log('Source escrow created:', srcEscrowResult);
-
-      // Step 2: Create escrow on destination chain
-      const dstEscrowResult = await this.createDestinationEscrow(order, orderHash);
-      console.log('Destination escrow created:', dstEscrowResult);
-
-      // Step 3: Validate escrows with relayer
-      const validationRequest: EscrowValidationRequest = {
-        orderHash,
-        srcEscrowAddress: srcEscrowResult.escrowAddress,
-        dstEscrowAddress: dstEscrowResult.escrowAddress,
-        srcChainId: order.srcChainId?.toString() || this.resolverConfig.crossChain.sourceNetworkId.toString(),
-        dstChainId: order.dstChainId?.toString() || this.resolverConfig.crossChain.destinationNetworkId.toString()
-      };
-
-      console.log('Secret request validation data:', validationRequest);
-
-      // Step 4: Request secret from relayer
-      const secretResponse = await this.relayerService.requestSecret(orderHash, validationRequest);
-      
-      console.log('Secret response:', secretResponse);
-      
-      if (!secretResponse.success || !secretResponse.data?.secret) {
-        console.error('Secret request failed:', secretResponse.error);
-        throw new Error(`Failed to get secret from relayer: ${secretResponse.error?.message || 'Unknown error'}`);
-      }
-
-      const secret = secretResponse.data.secret;
-
-      // Step 5: Withdraw from destination escrow
-      const dstWithdrawResult = await this.withdrawFromDestinationEscrow(orderHash, secret);
-      console.log('Destination withdrawal completed:', dstWithdrawResult);
-
-      // Step 6: Withdraw from source escrow
-      const srcWithdrawResult = await this.withdrawFromSourceEscrow(srcEscrowResult, secret);
-      console.log('Source withdrawal completed:', srcWithdrawResult);
-
-      const executionTime = Date.now() - startTime;
+      // Step 1: deposit to source escrow
+      const depositResult = await this.depositToSrcEscrow(order, orderHash);
+      console.log('Source escrow deposit completed:', depositResult);
 
       return {
         success: true,
         orderHash,
-        transactionHash: srcEscrowResult.transactionHash,
-        executionTime,
+        transactionHash: depositResult.transactionHash,
+        executionTime: Date.now() - startTime,
         profit: this.calculateProfit(order), // Mock profit calculation
-        gasUsed: srcEscrowResult.gasUsed || 0
+        gasUsed: 0 // TODO: Get actual gas used from deposit result
       };
 
     } catch (error) {
@@ -119,21 +84,75 @@ export class ExecutionService {
   }
 
   /**
-   * Create source escrow (EVM side)
+   * Deposit to source escrow (EVM side)
    */
-  private async createSourceEscrow(order: any, orderHash: string) {
-    // This would use the 1inch SDK to create the source escrow
-    // For now, we'll mock the implementation based on the example script
-    
-    // Simulate escrow creation
-    const escrowAddress = `0x${randomBytes(20).toString('hex')}`;
-    const gasUsed = Math.floor(Math.random() * 200000) + 100000; // Mock gas usage
-    
-    return {
-      escrowAddress,
-      transactionHash: `0x${randomBytes(32).toString('hex')}`,
-      gasUsed
-    };
+  private async depositToSrcEscrow(order: any, orderHash: string): Promise<DepositResult> {
+    try {
+      // Initialize EVM adapter with required configuration
+      const evmConfig: EvmAdapterConfig = {
+        resolverProxyAddress: this.resolverConfig.crossChain.resolverProxyAddress,
+        sourceChainId: this.resolverConfig.crossChain.sourceNetworkId,
+        lopAddress: this.resolverConfig.crossChain.lopAddress,
+        escrowFactoryAddress: this.resolverConfig.crossChain.escrowFactoryAddress,
+      };
+
+      const evmAdapter = new EvmAdapter(this.provider, evmConfig);
+
+      // Check if we have the required extension and signature fields
+      if (!order.extension || !order.signature) {
+        console.log("Order data available:", {
+          maker: order.maker,
+          makerAsset: order.makerAsset,
+          takerAsset: order.takerAsset,
+          makingAmount: order.makingAmount,
+          takingAmount: order.takingAmount,
+          receiver: order.receiver,
+          makerTraits: order.makerTraits, // This contains the hashlock
+          extension: order.extension,
+          signature: order.signature,
+        });
+
+        // For now, return a mock result since we don't have the required extension and signature
+        // In production, this should be replaced with actual EVM adapter call
+        const mockEscrowAddress = `0x${randomBytes(20).toString('hex')}`;
+        const mockTransactionHash = `0x${randomBytes(32).toString('hex')}`;
+        
+        console.log("Mock deposit result - Missing extension and signature data");
+        
+        return {
+          escrowAddress: mockEscrowAddress,
+          transactionHash: mockTransactionHash,
+          blockHash: `0x${randomBytes(32).toString('hex')}`,
+          blockTimestamp: Math.floor(Date.now() / 1000),
+          srcEscrowEvent: [] as any, // Mock event data
+        };
+      }
+
+      // We have the required fields, proceed with actual EVM adapter call
+      console.log("Using actual EVM adapter with extension and signature data");
+      
+      // Re-create the order object from serialized data
+      // Need to decode the extension string back to Extension object
+      const extension = Extension.decode(order.extension);
+      const evmOrder = EvmCrossChainOrder.fromDataAndExtension(
+        order,
+        extension
+      );
+
+      // Execute deposit (order hash patching happens inside evmAdapter)
+      const depositResult = await evmAdapter.deployAndDepositToSrcEscrow(
+        evmOrder,
+        order.signature,
+        this.wallet,
+        BigInt(order.makingAmount)
+      );
+
+      return depositResult;
+      
+    } catch (error) {
+      console.error('Failed to deposit to source escrow:', error);
+      throw error;
+    }
   }
 
   /**

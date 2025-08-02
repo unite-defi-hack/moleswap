@@ -1,4 +1,6 @@
 // Order types matching the relayer API
+import {Wallet} from "ethers/lib.esm";
+
 export interface Order {
   maker: string;
   makerAsset: string;
@@ -12,6 +14,11 @@ export interface Order {
   dstChainId?: number;
   srcEscrowAddress?: string;
   dstEscrowAddress?: string;
+  // Additional fields from relayer database
+  extension?: string;
+  signature?: string;
+  secret?: string;
+  secretHash?: string;
 }
 
 export interface OrderWithMetadata {
@@ -20,6 +27,10 @@ export interface OrderWithMetadata {
   status: string;
   createdAt: string | null;
   updatedAt: string | null;
+  // Fields from relayer response (at top level)
+  extension?: string;
+  signature?: string;
+  secretHash?: string;
 }
 
 export interface RelayerOrderResponse {
@@ -65,6 +76,7 @@ export interface ExecutionConfig {
   privateKey: string;
   rpcUrl: string;
   chainId: number;
+  wallet: Wallet;
 }
 
 export interface ExecutionResult {

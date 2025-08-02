@@ -2,6 +2,11 @@
 # yarn lockfile v1
 
 
+"@1inch/byte-utils@3.0.0":
+  version "3.0.0"
+  resolved "https://registry.npmjs.org/@1inch/byte-utils/-/byte-utils-3.0.0.tgz"
+  integrity sha512-CuX4E0z/pzo9hKGzFsMi3vPVgHRRh14ZwNEZ5TY1svnKF8PjxWx3t0CjXCW4dyqKGe6TKAzgYqzzxrMrWPDy5Q==
+
 "@1inch/cross-chain-sdk@file:../1inch-cross-chain-sdk":
   version "0.2.1-rc.55"
   resolved "file:../1inch-cross-chain-sdk"
@@ -19,6 +24,14 @@
     ethers "6.13.1"
     tslib "2.6.3"
     ws "^8.18.0"
+
+"@1inch/limit-order-sdk@^4.0.0":
+  version "4.13.0"
+  resolved "https://registry.npmjs.org/@1inch/limit-order-sdk/-/limit-order-sdk-4.13.0.tgz"
+  integrity sha512-n+8EG1aY5wSHkiGv3rqJ/0YQPVqiIu6EPgiOrjnx0+82oydmoEJXaj/tGmFUAuxTJkfYGdzbL/d4vzVGWSXP+Q==
+  dependencies:
+    "@1inch/byte-utils" "3.0.0"
+    ethers "6.13.5"
 
 "@adraffy/ens-normalize@1.10.1":
   version "1.10.1"
@@ -987,7 +1000,7 @@ asynckit@^0.4.0:
   resolved "https://registry.npmjs.org/asynckit/-/asynckit-0.4.0.tgz"
   integrity sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==
 
-axios@^1.6.0:
+axios@^1.6.0, "axios@>=1 <2":
   version "1.11.0"
   resolved "https://registry.npmjs.org/axios/-/axios-1.11.0.tgz"
   integrity sha512-1Lx3WLFQWm3ooKDYZD1eXmoGO9fxYQjrycfHFC8P0sCfQVXyROp0p9PFWBehewBOdCwHc+f/b8I0fMto5eSfwA==
@@ -1534,6 +1547,19 @@ ethers@^6.8.0:
   version "6.15.0"
   resolved "https://registry.npmjs.org/ethers/-/ethers-6.15.0.tgz"
   integrity sha512-Kf/3ZW54L4UT0pZtsY/rf+EkBU7Qi5nnhonjUb8yTXcxH3cdcWrV2cRyk0Xk/4jK6OoHhxxZHriyhje20If2hQ==
+  dependencies:
+    "@adraffy/ens-normalize" "1.10.1"
+    "@noble/curves" "1.2.0"
+    "@noble/hashes" "1.3.2"
+    "@types/node" "22.7.5"
+    aes-js "4.0.0-beta.5"
+    tslib "2.7.0"
+    ws "8.17.1"
+
+ethers@6.13.5:
+  version "6.13.5"
+  resolved "https://registry.npmjs.org/ethers/-/ethers-6.13.5.tgz"
+  integrity sha512-+knKNieu5EKRThQJWwqaJ10a6HE9sSehGeqWN65//wE7j47ZpFhKAnHB/JJFibwwg61I/koxaPsXbXpD/skNOQ==
   dependencies:
     "@adraffy/ens-normalize" "1.10.1"
     "@noble/curves" "1.2.0"
