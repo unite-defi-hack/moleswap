@@ -6,7 +6,7 @@ export async function run(provider: NetworkProvider) {
     const ui = provider.ui();
 
     const manifestUrl =
-        'https://raw.githubusercontent.com/refs/heads/main/unite-defi-hack/moleswap/scripts/jettons/mole.json';
+        'https://raw.githubusercontent.com/unite-defi-hack/moleswap/refs/heads/main/ton/scripts/jettons/mole.json';
 
     const tokenMinter = provider.open(
         JettonMinter.createFromConfig(
