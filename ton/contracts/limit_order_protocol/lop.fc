@@ -8,7 +8,6 @@
 
 #pragma version >=0.4.4;
 
-const storage_fee = 5000000; ;; 0.005 TON
 const exec_fee = 70000000;  ;; 0.07 TON
 const order_exec_fee = 30000000;  ;; 0.03 TON
 const reserve_fee = 1000000;  ;; 0.001 TON
@@ -176,10 +175,10 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         );
         send_jetton(
             to_contract_address,
-            making_amount,
+            taking_amount,
             sender_address,
             excesses_addr,
-            0,
+            min_security_deposit,
             null(),
             0,
             query_id,

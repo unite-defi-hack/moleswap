@@ -12,6 +12,7 @@ const exec_fee = 50000000;  ;; 0.05 TON
 const min_security_deposit = 100000000;  ;; 0.1 TON
 const operational_fees = 1000000;  ;; 0.001 TON
 const notification_fee = 10000000;  ;; 0.01 TON
+const cancel_fee_return = 10000000;  ;; 0.01 TON
 
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -168,7 +169,7 @@ const notification_fee = 10000000;  ;; 0.01 TON
         ;; maker should be able to cancel own order at any time
         if (equal_slice_bits(sender_address, storage::maker_addr)) {
             if (address::is_hole(storage::maker_asset_addr)) {
-                send_ton(storage::maker_addr, storage::maker_asset_amount + operational_fees);
+                send_ton(storage::maker_addr, storage::maker_asset_amount + cancel_fee_return);
             } else {
                 send_jetton(
                     storage::maker_addr,
@@ -192,7 +193,7 @@ const notification_fee = 10000000;  ;; 0.01 TON
             now() >= storage::execution_start_time + storage::cancellation_timelock);
 
         if (address::is_hole(storage::maker_asset_addr)) {
-            send_ton(storage::maker_addr, storage::maker_asset_amount + operational_fees);
+            send_ton(storage::maker_addr, storage::maker_asset_amount);
         } else {
             send_jetton(
                 storage::maker_addr,

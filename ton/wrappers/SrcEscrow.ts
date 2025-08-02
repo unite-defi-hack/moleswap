@@ -149,7 +149,7 @@ export class SrcEscrow implements Contract {
         });
     }
 
-    async sendCancel(provider: ContractProvider, via: Sender, value: bigint = toNano('0.05'), query_id: number = 0) {
+    async sendCancel(provider: ContractProvider, via: Sender, value: bigint = toNano(0.05), query_id: number = 0) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,

@@ -108,7 +108,7 @@ export class DstEscrow implements Contract {
         provider: ContractProvider,
         via: Sender,
         secret: bigint,
-        value: bigint = toNano(0.1),
+        value: bigint = toNano(0.05),
         query_id: number = 0,
     ) {
         await provider.internal(via, {

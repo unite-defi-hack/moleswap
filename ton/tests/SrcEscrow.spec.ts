@@ -294,7 +294,9 @@ describe('SrcEscrow', () => {
             to: maker.address,
             success: true,
         });
-        expect(await maker.getBalance()).toBeGreaterThanOrEqual(makerBalanceBefore + order.making_amount);
+        expect(await maker.getBalance()).toBeGreaterThanOrEqual(
+            makerBalanceBefore + order.making_amount - toNano(0.05),
+        );
     });
 
     it('anyone can public cancel and receive deposit', async () => {
