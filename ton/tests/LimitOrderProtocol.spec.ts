@@ -670,4 +670,43 @@ describe('Limit order protocol', () => {
         expect(await receiverWallet.getJettonBalance()).toEqual(receiverJettonBalanceBefore + order.taking_amount);
         expect(await someUser.getBalance()).toBeGreaterThanOrEqual(userBalanceBefore + deposit - toNano(0.02));
     });
+
+    it('taker should close dst escrow successful and receive jettons back', async () => {
+        const order = { ...dstOrder, taker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(dstEscrowAddress);
+
+        await fillJettonOrder(order);
+
+        const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrowAddress));
+        const takerWallet = blockchain.openContract(
+            JettonWallet.createFromAddress(await jettonMinter.getWalletAddress(taker.address)),
+        );
+        const takerJettonBalanceBefore = await takerWallet.getJettonBalance();
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.dstCancellation + 1;
+
+        const result = await dstEscrowSC.sendCancel(taker.getSender());
+
+        expect(result.transactions).toHaveTransaction({
+            from: taker.address,
+            to: dstEscrowAddress,
+            op: EscrowOp.cancel,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: dstEscrowAddress,
+            to: order.asset_jetton_address,
+            op: JettonOp.transfer,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: takerWallet.address,
+            to: taker.address,
+            op: JettonOp.transfer_notification,
+            success: true,
+        });
+        expect(await takerWallet.getJettonBalance()).toEqual(takerJettonBalanceBefore + order.taking_amount);
+    });
 });
