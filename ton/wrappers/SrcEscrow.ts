@@ -89,7 +89,7 @@ export class SrcEscrow implements Contract {
         });
     }
 
-    async sendClaim(provider: ContractProvider, via: Sender, value: bigint = toNano('0.15'), query_id: number = 0) {
+    async sendClaim(provider: ContractProvider, via: Sender, value: bigint = toNano(0.16), query_id: number = 0) {
         await provider.internal(via, {
             value,
             sendMode: SendMode.PAY_GAS_SEPARATELY,
@@ -135,7 +135,7 @@ export class SrcEscrow implements Contract {
         provider: ContractProvider,
         via: Sender,
         secret: bigint,
-        value: bigint = toNano('0.05'),
+        value: bigint = toNano('0.1'),
         query_id: number = 0,
     ) {
         await provider.internal(via, {

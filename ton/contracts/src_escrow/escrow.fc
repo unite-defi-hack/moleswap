@@ -8,9 +8,10 @@
 
 #pragma version >=0.4.4;
 
-const exec_fee = 30000000;  ;; 0.03 TON
+const exec_fee = 50000000;  ;; 0.05 TON
 const min_security_deposit = 100000000;  ;; 0.1 TON
 const operational_fees = 1000000;  ;; 0.001 TON
+const notification_fee = 10000000;  ;; 0.01 TON
 
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -91,9 +92,9 @@ const operational_fees = 1000000;  ;; 0.001 TON
             send_jetton(
                 sender_address,
                 storage::maker_asset_amount,
-                storage::maker_asset_addr,
+                storage::asset_jetton_address,
                 sender_address,
-                0,
+                notification_fee,
                 null(),
                 0,
                 query_id,
@@ -122,9 +123,9 @@ const operational_fees = 1000000;  ;; 0.001 TON
             send_jetton(
                 to_address,
                 storage::maker_asset_amount,
-                storage::maker_asset_addr,
+                storage::asset_jetton_address,
                 sender_address,
-                0,
+                notification_fee,
                 null(),
                 0,
                 query_id,
@@ -150,9 +151,9 @@ const operational_fees = 1000000;  ;; 0.001 TON
             send_jetton(
                 storage::taker_src_addr,
                 storage::maker_asset_amount,
-                storage::maker_asset_addr,
+                storage::asset_jetton_address,
                 sender_address,
-                0,
+                notification_fee,
                 null(),
                 exec_fee,
                 query_id,
@@ -166,7 +167,22 @@ const operational_fees = 1000000;  ;; 0.001 TON
     if (op == op::cancel) {
         ;; maker should be able to cancel own order at any time
         if (equal_slice_bits(sender_address, storage::maker_addr)) {
-            destruct_and_pay(storage::maker_addr);
+            if (address::is_hole(storage::maker_asset_addr)) {
+                send_ton(storage::maker_addr, storage::maker_asset_amount + operational_fees);
+            } else {
+                send_jetton(
+                    storage::maker_addr,
+                    storage::maker_asset_amount,
+                    storage::asset_jetton_address,
+                    sender_address,
+                    notification_fee,
+                    null(),
+                    exec_fee,
+                    query_id,
+                    PAY_FEES_SEPARATELY
+                );
+            }
+            destruct_and_pay(storage::taker_src_addr);
             return ();
         }
 
@@ -175,6 +191,21 @@ const operational_fees = 1000000;  ;; 0.001 TON
         throw_unless(error::cancelation_phase_not_started,
             now() >= storage::execution_start_time + storage::cancellation_timelock);
 
+        if (address::is_hole(storage::maker_asset_addr)) {
+            send_ton(storage::maker_addr, storage::maker_asset_amount + operational_fees);
+        } else {
+            send_jetton(
+                storage::maker_addr,
+                storage::maker_asset_amount,
+                storage::asset_jetton_address,
+                sender_address,
+                notification_fee,
+                null(),
+                exec_fee,
+                query_id,
+                PAY_FEES_SEPARATELY
+            );
+        }
         destruct_and_pay(storage::taker_src_addr);
         return ();
     }
@@ -190,9 +221,9 @@ const operational_fees = 1000000;  ;; 0.001 TON
             send_jetton(
                 storage::maker_addr,
                 storage::maker_asset_amount,
-                storage::maker_asset_addr,
+                storage::asset_jetton_address,
                 sender_address,
-                0,
+                notification_fee,
                 null(),
                 exec_fee,
                 query_id,
