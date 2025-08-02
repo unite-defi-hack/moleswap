@@ -2,3 +2,5 @@ node_modules/
 order.json
 .env
 .DS_Store
+
+.claude/

@@ -1,0 +1,28 @@
+{
+  "name": "moleswap-monorepo",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter @1inch/cross-chain-sdk build && pnpm --filter ui build",
+    "build:sdk": "pnpm --filter @1inch/cross-chain-sdk build",
+    "build:ui": "pnpm --filter ui build",
+    "dev": "pnpm --filter ui dev",
+    "install:all": "pnpm install",
+    "postinstall": "pnpm build:sdk"
+  },
+  "pnpm": {
+    "overrides": {
+      "cross-spawn@>=7.0.0 <7.0.5": ">=7.0.5",
+      "elliptic@<=6.6.0": ">=6.6.1"
+    },
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "bigint-buffer",
+      "bufferutil",
+      "cpu-features",
+      "protobufjs",
+      "ssh2",
+      "unrs-resolver",
+      "utf-8-validate"
+    ]
+  }
+}
