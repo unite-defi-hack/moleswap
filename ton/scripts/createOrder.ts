@@ -21,10 +21,10 @@ export async function run(provider: NetworkProvider, args: string[]) {
     ui.write(`Hash key: ${hashKey}`);
 
     const orderJsonPath = join(__dirname, join('orders', 'tonEthOrder.json'));
-    const order = await parseOrder(orderJsonPath);
+    const order = parseOrder(orderJsonPath);
     order.hashlock = BigInt(hashKey);
 
-    if (order.maker_asset === HOLE_ADDRESS) {
+    if (order.maker_asset.toString() === HOLE_ADDRESS.toString()) {
         await lopSC.sendCreateOrder(provider.sender(), order);
     } else {
         const lopJetton = provider.open(JettonWallet.createFromAddress(order.maker_asset as Address));

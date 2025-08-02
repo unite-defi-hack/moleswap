@@ -17,7 +17,7 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const orderJsonPath = join(__dirname, join('orders', 'ethTonOrder.json'));
     const order = parseOrder(orderJsonPath);
 
-    if (order.taker_asset === HOLE_ADDRESS) {
+    if (order.taker_asset.toString() === HOLE_ADDRESS.toString()) {
         await lopSC.sendFillOrder(provider.sender(), order);
     } else {
         const lopJetton = provider.open(JettonWallet.createFromAddress(order.taker_asset as Address));
