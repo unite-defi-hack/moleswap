@@ -5,7 +5,7 @@ import {
   ApiResponse, 
   OrderCreationResponse, 
   OrderErrorCode,
-  OrderWithMetadata,
+  OrderWithMetadataResponse,
   OrderStatus,
   OrderQueryResponse
 } from '../types/orders';
@@ -385,7 +385,7 @@ router.patch('/:orderHash/status', async (req: Request, res: Response) => {
       return res.status(404).json(response);
     }
     
-    const response: ApiResponse<OrderWithMetadata> = {
+    const response: ApiResponse<OrderWithMetadataResponse> = {
       success: true,
       data: updatedOrder
     };

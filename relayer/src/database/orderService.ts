@@ -1,5 +1,5 @@
 import { db } from './connection';
-import { Order, OrderStatus, OrderWithMetadata, OrderQueryFilters, OrderQueryResponse } from '../types/orders';
+import { Order, OrderStatus, OrderWithMetadata, OrderWithMetadataResponse, OrderQueryFilters, OrderQueryResponse } from '../types/orders';
 import { logger } from '../utils/logger';
 
 export interface InsertOrderParams {
@@ -105,8 +105,8 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
     .limit(limit)
     .offset(offset);
   
-  // Transform database records to OrderWithMetadata format
-  const transformedOrders: OrderWithMetadata[] = orders.map(order => {
+  // Transform database records to OrderWithMetadataResponse format (includes secretHash but excludes secret)
+  const transformedOrders: OrderWithMetadataResponse[] = orders.map(order => {
     const orderData = JSON.parse(order.order_data);
     return {
       order: {
@@ -124,7 +124,6 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
         dstEscrowAddress: order.destination_escrow || undefined
       } as Order,
       orderHash: order.order_hash,
-      secret: order.secret || undefined,
       secretHash: order.secret_hash || undefined,
       extension: order.extension || undefined,
       status: order.status as OrderStatus,
@@ -142,7 +141,7 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
   };
 }
 
-export async function updateOrderStatus(orderHash: string, newStatus: OrderStatus, _reason?: string): Promise<OrderWithMetadata | null> {
+export async function updateOrderStatus(orderHash: string, newStatus: OrderStatus, _reason?: string): Promise<OrderWithMetadataResponse | null> {
   // Get current order
   const currentOrder = await getOrderByHash(orderHash);
   if (!currentOrder) {
@@ -179,7 +178,7 @@ export async function updateOrderStatus(orderHash: string, newStatus: OrderStatu
     throw new Error('Failed to retrieve updated order');
   }
   
-  // Transform to OrderWithMetadata format
+  // Transform to OrderWithMetadataResponse format (includes secretHash but excludes secret)
   const orderData = JSON.parse(updatedOrder.order_data);
   return {
     order: {
@@ -197,7 +196,6 @@ export async function updateOrderStatus(orderHash: string, newStatus: OrderStatu
       dstEscrowAddress: updatedOrder.destination_escrow || undefined
     } as Order,
     orderHash: updatedOrder.order_hash,
-    secret: updatedOrder.secret || undefined,
     secretHash: updatedOrder.secret_hash || undefined,
     extension: updatedOrder.extension || undefined,
     status: updatedOrder.status as OrderStatus,

@@ -70,6 +70,8 @@ interface OrderWithMetadata {
   status: string;
   createdAt: string | null;
   updatedAt: string | null;
+  secretHash?: string | undefined;  // Hash of the secret (safe to share)
+  extension?: string | undefined;   // 1inch cross-chain extension data
 }
 
 interface GetOrdersResponse {
@@ -213,10 +215,46 @@ class RelayerClient {
       };
     }
   }
+
+  async getOrdersWithExtensionData(limit: number = 100, offset: number = 0): Promise<GetOrdersResponse> {
+    try {
+      // Get all orders and filter for those with extension data
+      const response = await axios.get(`${this.baseURL}/api/orders?limit=${limit}&offset=${offset}`);
+      
+      if (response.data.success && response.data.data) {
+        const ordersWithExtension = response.data.data.orders.filter((order: OrderWithMetadata) => 
+          order.extension || order.secretHash
+        );
+        
+        return {
+          success: true,
+          data: {
+            orders: ordersWithExtension,
+            total: ordersWithExtension.length,
+            limit: ordersWithExtension.length,
+            offset: 0,
+            hasMore: false
+          }
+        };
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      logger.error('Failed to get orders with extension data:', error.response?.data || error.message);
+      return {
+        success: false,
+        error: {
+          code: 'GET_ORDERS_WITH_EXTENSION_FAILED',
+          message: error.response?.data?.error?.message || error.message,
+          details: error.response?.data?.error?.details
+        }
+      };
+    }
+  }
 }
 
 function formatOrder(orderWithMetadata: OrderWithMetadata): string {
-  const { order, orderHash, status, createdAt, updatedAt } = orderWithMetadata;
+  const { order, orderHash, status, createdAt, updatedAt, secretHash, extension } = orderWithMetadata;
   
   // Format chain information
   const chainInfo = [];
@@ -227,6 +265,16 @@ function formatOrder(orderWithMetadata: OrderWithMetadata): string {
     chainInfo.push(`Destination: ${order.dstChainId}`);
   }
   const chainDisplay = chainInfo.length > 0 ? `\nChain IDs: ${chainInfo.join(' → ')}` : '';
+  
+  // Format extension and secret hash information
+  const extensionInfo = [];
+  if (extension) {
+    extensionInfo.push(`Extension: ${extension.substring(0, 20)}...`);
+  }
+  if (secretHash) {
+    extensionInfo.push(`Secret Hash: ${secretHash.substring(0, 20)}...`);
+  }
+  const extensionDisplay = extensionInfo.length > 0 ? `\nExtension Data: ${extensionInfo.join(' | ')}` : '';
   
   return `
 Order Hash: ${orderHash}
@@ -240,7 +288,7 @@ Receiver: ${order.receiver}
 Salt: ${order.salt}${chainDisplay}
 Created: ${createdAt || 'N/A'}
 Updated: ${updatedAt || 'N/A'}
-Maker Traits: ${order.makerTraits}
+Maker Traits: ${order.makerTraits}${extensionDisplay}
 ---`;
 }
 
@@ -376,6 +424,58 @@ async function main() {
     console.log('Failed to get Ethereum source orders:', ethereumSourceOrders.error?.message);
   }
 
+  // Example 12: Check for orders with extension data
+  console.log('\n📋 EXAMPLE 12: Orders with Extension Data');
+  const allOrdersForExtensionCheck = await client.getOrders(100, 0);
+  if (allOrdersForExtensionCheck.success && allOrdersForExtensionCheck.data) {
+    const ordersWithExtension = allOrdersForExtensionCheck.data.orders.filter(order => 
+      order.extension || order.secretHash
+    );
+    
+    if (ordersWithExtension.length > 0) {
+      displayOrders(ordersWithExtension, `Orders with Extension Data (${ordersWithExtension.length} found)`);
+      
+      // Summary of extension data
+      const extensionSummary = {
+        withExtension: ordersWithExtension.filter(o => o.extension).length,
+        withSecretHash: ordersWithExtension.filter(o => o.secretHash).length,
+        total: ordersWithExtension.length
+      };
+      
+      console.log('\n📊 Extension Data Summary:');
+      console.log(`- Orders with extension: ${extensionSummary.withExtension}`);
+      console.log(`- Orders with secret hash: ${extensionSummary.withSecretHash}`);
+      console.log(`- Total orders with extension data: ${extensionSummary.total}`);
+    } else {
+      console.log('No orders with extension data found.');
+    }
+  } else {
+    console.log('Failed to check for orders with extension data:', allOrdersForExtensionCheck.error?.message);
+  }
+
+  // Example 13: Using the dedicated extension data method
+  console.log('\n📋 EXAMPLE 13: Orders with Extension Data (Dedicated Method)');
+  const ordersWithExtensionData = await client.getOrdersWithExtensionData(100, 0);
+  if (ordersWithExtensionData.success && ordersWithExtensionData.data) {
+    if (ordersWithExtensionData.data.orders.length > 0) {
+      displayOrders(ordersWithExtensionData.data.orders, `Orders with Extension Data (${ordersWithExtensionData.data.total} total)`);
+      
+      // Detailed extension analysis
+      console.log('\n🔍 Detailed Extension Analysis:');
+      ordersWithExtensionData.data.orders.forEach((order, index) => {
+        console.log(`\nOrder ${index + 1}:`);
+        console.log(`  - Extension: ${order.extension ? 'Present' : 'Missing'}`);
+        console.log(`  - Secret Hash: ${order.secretHash ? 'Present' : 'Missing'}`);
+        console.log(`  - Order Hash: ${order.orderHash}`);
+        console.log(`  - Status: ${order.status}`);
+      });
+    } else {
+      console.log('No orders with extension data found using dedicated method.');
+    }
+  } else {
+    console.log('Failed to get orders with extension data using dedicated method:', ordersWithExtensionData.error?.message);
+  }
+
   // Summary
   console.log('\n📊 SUMMARY');
   console.log('='.repeat(50));
@@ -385,6 +485,10 @@ async function main() {
   console.log(`- Chains: ${Object.keys(FILTER_OPTIONS.chains).join(', ')}`);
   console.log(`- Time Ranges: ${Object.keys(FILTER_OPTIONS.timeRanges).join(', ')}`);
   console.log(`- Pagination: ${Object.keys(FILTER_OPTIONS.pagination).join(', ')}`);
+  console.log('\nExtension Fields Checked:');
+  console.log('- extension: 1inch cross-chain extension data');
+  console.log('- secretHash: Hash of the secret (safe to share)');
+  console.log('Note: Actual secret is excluded from API responses for security');
   console.log('\nUsage Examples:');
   console.log('- Get all orders: client.getOrders()');
   console.log('- Get orders by status: client.getOrdersByStatus("active")');
@@ -392,6 +496,7 @@ async function main() {
   console.log('- Get orders by source chain: client.getOrdersBySourceChain(11155111)');
   console.log('- Get orders by destination chain: client.getOrdersByDestinationChain(84532)');
   console.log('- Get cross-chain orders: client.getOrdersByChainPair(11155111, 84532)');
+  console.log('- Get orders with extension data: client.getOrdersWithExtensionData()');
   console.log('- Pagination: client.getOrders(limit, offset)');
 
   logger.info('Order listing script completed successfully!');

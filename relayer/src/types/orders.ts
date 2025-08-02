@@ -46,6 +46,19 @@ export interface OrderWithMetadata {
 }
 
 /**
+ * Order with metadata for API responses (excludes secret field but includes secretHash)
+ */
+export interface OrderWithMetadataResponse {
+  order: Order;
+  orderHash: string;                // EIP-712 order hash
+  secretHash?: string | undefined;  // Hash of the secret (safe to share)
+  extension?: string | undefined;   // 1inch cross-chain extension data
+  status: OrderStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
  * Order status enumeration
  */
 export enum OrderStatus {
@@ -125,7 +138,7 @@ export interface OrderQueryFilters {
  * Order query response
  */
 export interface OrderQueryResponse {
-  orders: OrderWithMetadata[];
+  orders: OrderWithMetadataResponse[];
   total: number;
   limit: number;
   offset: number;
