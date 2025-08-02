@@ -23,6 +23,8 @@ global int storage::public_withdrawal_timelock;
 global int storage::cancellation_timelock;
 global int storage::public_cancellation_timelock;
 
+global slice storage::asset_jetton_address;
+
 
 () load_data() impure inline {
     slice ds = get_data().begin_parse();
@@ -53,6 +55,9 @@ global int storage::public_cancellation_timelock;
     storage::taker_asset_addr = ds_taker~load_uint(256);
     storage::taker_asset_amount = ds_taker~load_uint(128);
     storage::taker_src_addr = slice_data_empty?(ds_taker) ? empty_slice() : ds_taker~load_msg_addr();
+
+    slice ds_jetton = (ds~load_ref()).begin_parse();
+    storage::asset_jetton_address = slice_data_empty?(ds_jetton) ? empty_slice() : ds_jetton~load_msg_addr();
 }
 
 () save_data() impure inline {
@@ -79,6 +84,9 @@ global int storage::public_cancellation_timelock;
                     .store_uint(storage::taker_asset_addr, 256)
                     .store_uint(storage::taker_asset_amount, 128)
                     .store_slice(storage::taker_src_addr)
+                    .end_cell())
+        .store_ref(begin_cell()
+                    .store_slice(storage::asset_jetton_address)
                     .end_cell())
         .end_cell());
 }

@@ -15,7 +15,7 @@ import { JettonWallet } from '../wrappers/JettonWallet';
 const HOUR = 1000 * 60 * 60;
 const DAY = 24 * HOUR;
 
-describe('UserOrder', () => {
+describe('Limit order protocol', () => {
     let blockchain: Blockchain;
 
     let limitOrderProtocolCode: Cell;
@@ -151,7 +151,7 @@ describe('UserOrder', () => {
         });
     }
 
-    async function createOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+    async function createOrder(order: OrderConfig): Promise<any> {
         const result = await lopSC.sendCreateOrder(maker.getSender(), order);
 
         expect(result.transactions).toHaveTransaction({
@@ -161,12 +161,11 @@ describe('UserOrder', () => {
             success: true,
         });
 
-        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
-        return { result, orderHash };
+        return result;
     }
 
-    async function fillOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
-        const result = await lopSC.sendFillOrder(taker.getSender(), dstOrder);
+    async function fillOrder(order: OrderConfig): Promise<any> {
+        const result = await lopSC.sendFillOrder(taker.getSender(), order);
 
         expect(result.transactions).toHaveTransaction({
             from: taker.address,
@@ -174,12 +173,10 @@ describe('UserOrder', () => {
             op: LopOp.fill_order,
             success: true,
         });
-
-        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
-        return { result, orderHash };
+        return result;
     }
 
-    async function createJettonOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+    async function createJettonOrder(order: OrderConfig): Promise<any> {
         const jettonWalletAddr = await jettonMinter.getWalletAddress(maker.address!!);
         const jettonWallet = blockchain.openContract(JettonWallet.createFromAddress(jettonWalletAddr));
 
@@ -205,11 +202,10 @@ describe('UserOrder', () => {
             success: true,
         });
 
-        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
-        return { result, orderHash };
+        return result;
     }
 
-    async function fillJettonOrder(order: OrderConfig): Promise<{ result: any; orderHash: bigint }> {
+    async function fillJettonOrder(order: OrderConfig): Promise<any> {
         const jettonWalletAddr = await jettonMinter.getWalletAddress(taker.address!!);
         const jettonWallet = blockchain.openContract(JettonWallet.createFromAddress(jettonWalletAddr));
 
@@ -235,14 +231,14 @@ describe('UserOrder', () => {
             success: true,
         });
 
-        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
-        return { result, orderHash };
+        return result;
     }
 
     it('create a new order successful', async () => {
-        const { result, orderHash } = await createOrder(srcOrder);
-        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        const result = await createOrder(srcOrder);
 
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(srcOrder);
+        const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: srcEscrowAddress,
@@ -265,9 +261,10 @@ describe('UserOrder', () => {
     });
 
     it('taker should fill order successful', async () => {
-        const { result, orderHash } = await fillOrder(dstOrder);
-        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        const result = await fillOrder(dstOrder);
 
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(dstOrder);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: dstEscrowAddress,
@@ -291,8 +288,9 @@ describe('UserOrder', () => {
 
     it('create a new order with jetton successful', async () => {
         const order = { ...srcOrder, maker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
-        const { result, orderHash } = await createJettonOrder(order);
+        const result = await createJettonOrder(order);
 
+        const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
         const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
@@ -317,8 +315,9 @@ describe('UserOrder', () => {
 
     it('fill existing order with jetton successful', async () => {
         const order = { ...dstOrder, taker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
-        const { result, orderHash } = await fillJettonOrder(order);
+        const result = await fillJettonOrder(order);
 
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
         const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,

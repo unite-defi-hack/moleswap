@@ -52,6 +52,8 @@ const operational_fees = 1000000;  ;; 0.001 TON
         storage::taker_asset_addr = taker_cs~load_msg_addr();
         storage::taker_asset_amount = taker_cs~load_coins();
 
+        storage::asset_jetton_address = empty_slice(); ;; used for jettons orders only
+
         throw_unless(error::expired, now() < storage::expiration_time);
         throw_unless(error::not_ready, now() >= storage::creation_time);
 
@@ -70,7 +72,21 @@ const operational_fees = 1000000;  ;; 0.001 TON
         int secret = in_msg_body~load_uint(256);
         validate_secret(secret, storage::hashlock);
 
-        destruct_and_pay(storage::receiver_addr);
+        if (address::is_hole(storage::taker_asset_addr)) {
+            destruct_and_pay(storage::receiver_addr);
+        } else {
+            send_jetton(
+                storage::receiver_addr,
+                storage::taker_asset_amount,
+                storage::taker_asset_addr,
+                sender_address,
+                0,
+                null(),
+                0,
+                query_id,
+                CARRY_REMAINING_BALANCE + SELFDESTRUCT_ON_EMPTY
+            );
+        }
         return ();
     }
 
@@ -84,7 +100,21 @@ const operational_fees = 1000000;  ;; 0.001 TON
         int secret = in_msg_body~load_uint(256);
         validate_secret(secret, storage::hashlock);
 
-        send_ton(storage::receiver_addr, storage::taker_asset_amount + operational_fees);
+        if (address::is_hole(storage::taker_asset_addr)) {
+            send_ton(storage::receiver_addr, storage::taker_asset_amount + operational_fees);
+        } else {
+            send_jetton(
+                storage::receiver_addr,
+                storage::taker_asset_amount,
+                storage::taker_asset_addr,
+                sender_address,
+                0,
+                null(),
+                exec_fee,
+                query_id,
+                PAY_FEES_SEPARATELY
+            );
+        }
         destruct_and_pay(sender_address);
         return ();
     }
@@ -95,7 +125,21 @@ const operational_fees = 1000000;  ;; 0.001 TON
         throw_unless(error::cancelation_phase_not_started,
             now() >= storage::execution_start_time + storage::cancellation_timelock);
 
-        destruct_and_pay(storage::taker_addr);
+        if (address::is_hole(storage::taker_asset_addr)) {
+            destruct_and_pay(storage::taker_addr);
+        } else {
+            send_jetton(
+                storage::taker_addr,
+                storage::taker_asset_amount,
+                storage::taker_asset_addr,
+                sender_address,
+                0,
+                null(),
+                0,
+                query_id,
+                CARRY_REMAINING_BALANCE + SELFDESTRUCT_ON_EMPTY
+            );
+        }
         return ();
     }
 

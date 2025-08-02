@@ -58,7 +58,7 @@ describe('DstEscrow', () => {
             maker_asset: ethAddressToBigInt('0x2222222222222222222222222222222222222222'),
             making_amount: toNano('100'),
             receiver_address: (await blockchain.treasury('receiver')).address,
-            taker_asset: (await blockchain.treasury('toAsset')).address,
+            taker_asset: HOLE_ADDRESS,
             taking_amount: toNano('200'),
             taker_address: taker.address,
         };
