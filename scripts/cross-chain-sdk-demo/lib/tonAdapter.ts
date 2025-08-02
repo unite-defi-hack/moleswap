@@ -3,7 +3,7 @@ import { TonClient, WalletContractV4, internal } from "@ton/ton";
 import { mnemonicToWalletKey } from "@ton/crypto";
 import {
   LimitOrderProtocol,
-  OrderConfig as MoleSwapTonToEvmOrder,
+  OrderConfig as MoleSwapOrderConfig,
   ethAddressToBigInt,
   HOLE_ADDRESS,
   LopOp,
@@ -12,7 +12,17 @@ import {
 } from "moleswap-ton";
 
 import { initMoleswapConfig } from "./config";
-import { TonCrossChainOrder } from "@1inch/cross-chain-sdk";
+import { TonCrossChainOrder, TimeLocks } from "@1inch/cross-chain-sdk";
+
+/**
+ * Extended OrderConfig that includes TimeLocks and safety deposits
+ * for cross-chain operations
+ */
+export interface OrderConfig extends MoleSwapOrderConfig {
+  timeLocks: TimeLocks;
+  srcSafetyDeposit?: bigint;
+  dstSafetyDeposit?: bigint;
+}
 
 export interface TonDestinationResult {
   transactionHash: string;
@@ -47,7 +57,7 @@ export class TonAdapter {
 
 
   static async sendCreateOrder(
-    orderData: MoleSwapTonToEvmOrder,
+    orderData: OrderConfig,
   ) {
 
     const config = initMoleswapConfig();
@@ -63,7 +73,7 @@ export class TonAdapter {
     );
 
     const result = await TonAdapter.waitForTransaction(walletContract, seqno);
-    console.log("Transaction result:", result);
+    return result;
   }
 
   static async calculateSrcEscrowAddress(
@@ -237,7 +247,7 @@ export class TonAdapter {
   }
   static async createDestinationEscrow(
     lopAddress: string,
-    tonOrder: MoleSwapTonToEvmOrder
+    tonOrder: OrderConfig
   ): Promise<TonDestinationResult> {
     try {
       const config = initMoleswapConfig();
@@ -299,7 +309,7 @@ export class TonAdapter {
     }
   }
 
-  static async calculateOrderHash(order: MoleSwapTonToEvmOrder): Promise<bigint> {
+  static async calculateOrderHash(order: OrderConfig): Promise<bigint> {
     // make onchain call to calculate order hash
     const config = initMoleswapConfig();
     const { client } = await TonAdapter.setupTonWallet(config.tonTakerMnemonic);
@@ -313,7 +323,7 @@ export class TonAdapter {
   static createEvmToTonOrderConfig(
     evmOrderData: any,
     receiverAddress: string
-  ): MoleSwapTonToEvmOrder {
+  ): OrderConfig {
     return {
       maker_address: ethAddressToBigInt(evmOrderData.order.maker),
       maker_asset: ethAddressToBigInt(evmOrderData.order.makerAsset),
@@ -329,14 +339,17 @@ export class TonAdapter {
       ),
       hashlock: BigInt(evmOrderData.hashlock),
       salt: BigInt(evmOrderData.order.salt),
+      timeLocks: evmOrderData.timeLocks,
+      srcSafetyDeposit: evmOrderData.srcSafetyDeposit ? BigInt(evmOrderData.srcSafetyDeposit) : 0n,
+      dstSafetyDeposit: evmOrderData.dstSafetyDeposit ? BigInt(evmOrderData.dstSafetyDeposit) : 0n,
     };
   }
 
   static async createTonToEvmOrderConfig(
     order: TonCrossChainOrder,
-  ): Promise<MoleSwapTonToEvmOrder> {
+  ): Promise<OrderConfig> {
 
-    const orderConfig: MoleSwapTonToEvmOrder = {
+    const orderConfig: OrderConfig = {
       maker_address: Address.parse(order.maker.toString()),
       maker_asset: Address.parse(order.makerAsset.toString()),
       making_amount: order.makingAmount,
@@ -347,6 +360,9 @@ export class TonAdapter {
       creation_time: Number(order.auctionStartTime),
       expiration_time: Number(order.auctionEndTime),
       hashlock: BigInt(order.hashLock.toString()),
+      timeLocks: order.timeLocks,
+      srcSafetyDeposit: order.srcSafetyDeposit,
+      dstSafetyDeposit: order.dstSafetyDeposit,
     }
 
     const orderHash = await TonAdapter.calculateOrderHash(orderConfig);

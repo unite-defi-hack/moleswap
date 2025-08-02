@@ -4,6 +4,9 @@ import {
   TransactionRequest,
   id,
   Interface,
+  toBigInt,
+  toBeHex,
+  zeroPadValue,
 } from "ethers";
 import {
   Address,
@@ -19,9 +22,70 @@ import {
 } from "@1inch/cross-chain-sdk";
 import { Signature } from "ethers";
 import { MoleswapConfig } from "./config";
+import { OrderConfig } from "./tonAdapter";
 
 // ABI definitions extracted from reference implementation
 const RESOLVER_ABI = [
+  {
+    type: "function",
+    name: "deployDst",
+    inputs: [
+      {
+        name: "dstImmutables",
+        type: "tuple",
+        internalType: "struct IBaseEscrow.Immutables",
+        components: [
+          {
+            name: "orderHash",
+            type: "bytes32",
+            internalType: "bytes32",
+          },
+          {
+            name: "hashlock",
+            type: "bytes32",
+            internalType: "bytes32",
+          },
+          {
+            name: "maker",
+            type: "uint256",
+            internalType: "Address",
+          },
+          {
+            name: "taker",
+            type: "uint256",
+            internalType: "Address",
+          },
+          {
+            name: "token",
+            type: "uint256",
+            internalType: "Address",
+          },
+          {
+            name: "amount",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "safetyDeposit",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "timelocks",
+            type: "uint256",
+            internalType: "Timelocks",
+          },
+        ],
+      },
+      {
+        name: "srcCancellationTimestamp",
+        type: "uint256",
+        internalType: "uint256",
+      },
+    ],
+    outputs: [],
+    stateMutability: "payable",
+  },
   {
     type: "function",
     name: "deploySrc",
@@ -73,6 +137,71 @@ const RESOLVER_ABI = [
     outputs: [],
     stateMutability: "nonpayable",
   },
+  {
+    type: "function",
+    name: "withdraw",
+    inputs: [
+      {
+        name: "escrow",
+        type: "address",
+        internalType: "contract IEscrow",
+      },
+      {
+        name: "secret",
+        type: "bytes32",
+        internalType: "bytes32",
+      },
+      {
+        name: "immutables",
+        type: "tuple",
+        internalType: "struct IBaseEscrow.Immutables",
+        components: [
+          {
+            name: "orderHash",
+            type: "bytes32",
+            internalType: "bytes32",
+          },
+          {
+            name: "hashlock",
+            type: "bytes32",
+            internalType: "bytes32",
+          },
+          {
+            name: "maker",
+            type: "uint256",
+            internalType: "Address",
+          },
+          {
+            name: "taker",
+            type: "uint256",
+            internalType: "Address",
+          },
+          {
+            name: "token",
+            type: "uint256",
+            internalType: "Address",
+          },
+          {
+            name: "amount",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "safetyDeposit",
+            type: "uint256",
+            internalType: "uint256",
+          },
+          {
+            name: "timelocks",
+            type: "uint256",
+            internalType: "Timelocks",
+          },
+        ],
+      },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
 ];
 
 const ESCROW_ABI = [
@@ -109,6 +238,38 @@ const ESCROW_FACTORY_ABI = [
     inputs: [],
     outputs: [{ name: "", type: "address" }],
     stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "ESCROW_DST_IMPLEMENTATION",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    inputs: [
+      {
+        internalType: "address",
+        name: "escrow",
+        type: "address",
+        indexed: false,
+      },
+      {
+        internalType: "bytes32",
+        name: "hashlock",
+        type: "bytes32",
+        indexed: false,
+      },
+      {
+        internalType: "Address",
+        name: "taker",
+        type: "uint256",
+        indexed: false,
+      },
+    ],
+    type: "event",
+    name: "DstEscrowCreated",
+    anonymous: false,
   },
   {
     type: "event",
@@ -164,6 +325,8 @@ export class EvmAdapter {
   private resolverInterface = new Interface(RESOLVER_ABI);
   private factoryInterface = new Interface(ESCROW_FACTORY_ABI);
   private escrowInterface = new Interface(ESCROW_ABI);
+  private srcImplementation?: Address;
+  private dstImplementation?: Address;
 
   constructor(
     private provider: JsonRpcProvider,
@@ -211,17 +374,48 @@ export class EvmAdapter {
   }
 
   async createDestinationEscrow(
-    order: EvmCrossChainOrder,
-    signature: string,
-    taker: Wallet,
-    fillAmount: bigint
+    wallet: Wallet,
+    orderHash: string,
+    hashLock: string,
+    maker: bigint,
+    token: bigint,
+    amount: bigint,
+    timeLocks: TimeLocks,
+    safetyDeposit: bigint
   ) {
+    const privateCancellation = timeLocks.toSrcTimeLocks(
+      toBigInt((new Date().getTime() / 1000).toFixed(0))
+    ).privateCancellation;
 
-    
+    const tx = {
+      to: this.config.resolverProxyAddress,
+      data: this.resolverInterface.encodeFunctionData("deployDst", [
+        {
+          orderHash: orderHash,
+          hashlock: hashLock,
+          maker: maker,
+          taker: this.config.resolverProxyAddress,
+          token: token,
+          amount,
+          safetyDeposit,
+          timelocks: timeLocks.build(),
+        },
+        privateCancellation,
+      ]),
+      value: safetyDeposit,
+    };
 
+    const { txHash, blockTimestamp, blockHash } = await this.executeTransaction(
+      wallet,
+      tx
+    );
 
-
-  };
+    return {
+      transactionHash: txHash,
+      blockHash,
+      blockTimestamp,
+    };
+  }
 
   /**
    * Patch order hash method to ensure consistency with maker's signature
@@ -439,6 +633,95 @@ export class EvmAdapter {
   }
 
   /**
+   * Get escrow address from deployment event by hashlock
+   * Works for both source and destination escrows
+   */
+  async getEscrowAddressFromEvent(
+    blockHash: string,
+    hashLock: string
+  ): Promise<{
+    escrowAddress: string;
+    blockTimestamp: number;
+    eventType: "source" | "destination";
+  }> {
+    // Get block timestamp
+    const block = await this.provider.getBlock(blockHash);
+    if (!block) {
+      throw new Error("Block not found");
+    }
+
+    // Try to find destination escrow event first (DstEscrowCreated)
+    const dstLogs = await this.provider.getLogs({
+      blockHash,
+      address: this.config.escrowFactoryAddress,
+      topics: [this.factoryInterface.getEvent("DstEscrowCreated")!.topicHash],
+    });
+
+    if (dstLogs.length > 0) {
+      // Find the event that matches our hashlock
+      for (const log of dstLogs) {
+        const decodedLog = this.factoryInterface.decodeEventLog(
+          "DstEscrowCreated",
+          log.data,
+          log.topics
+        );
+
+        // Check if hashlock matches
+        if (decodedLog.hashlock.toLowerCase() === hashLock.toLowerCase()) {
+          const escrowAddress = decodedLog.escrow;
+
+          return {
+            escrowAddress,
+            blockTimestamp: block.timestamp,
+            eventType: "destination" as const,
+          };
+        }
+      }
+    }
+
+    // Try source escrow event (SrcEscrowCreated)
+    const srcLogs = await this.provider.getLogs({
+      blockHash,
+      address: this.config.escrowFactoryAddress,
+      topics: [this.factoryInterface.getEvent("SrcEscrowCreated")!.topicHash],
+    });
+
+    if (srcLogs.length > 0) {
+      // Find the event that matches our hashlock
+      for (const log of srcLogs) {
+        const decodedLog = this.factoryInterface.decodeEventLog(
+          "SrcEscrowCreated",
+          log.data,
+          log.topics
+        );
+
+        // Check if hashlock matches
+        if (
+          decodedLog.srcImmutables.hashlock.toLowerCase() ===
+          hashLock.toLowerCase()
+        ) {
+          const [srcImmutables] = await this.getSrcDeployEvent(blockHash);
+          const srcImplementation = await this.getSourceImplementation();
+          const escrowAddress = this.calculateSrcEscrowAddress(
+            srcImmutables,
+            srcImplementation
+          );
+
+          return {
+            escrowAddress: escrowAddress.toString(),
+            blockTimestamp: block.timestamp,
+            eventType: "source" as const,
+          };
+        }
+      }
+    }
+
+    throw new Error(
+      `No escrow deployment event found with hashlock ${hashLock} in block ${blockHash}`
+    );
+  }
+
+  /**
    * Get source escrow event from a known block hash (for external use)
    */
   async getSrcDeployEventFromReceipt(
@@ -451,14 +734,17 @@ export class EvmAdapter {
    * Get source implementation address
    */
   private async getSourceImplementation(): Promise<Address> {
-    return Address.fromBigInt(
-      BigInt(
-        await this.provider.call({
-          to: this.config.escrowFactoryAddress,
-          data: id("ESCROW_SRC_IMPLEMENTATION()").slice(0, 10),
-        })
-      )
-    );
+    if (!this.srcImplementation) {
+      this.srcImplementation = Address.fromBigInt(
+        BigInt(
+          await this.provider.call({
+            to: this.config.escrowFactoryAddress,
+            data: id("ESCROW_SRC_IMPLEMENTATION()").slice(0, 10),
+          })
+        )
+      );
+    }
+    return this.srcImplementation;
   }
 
   /**
@@ -471,5 +757,114 @@ export class EvmAdapter {
     return new EvmEscrowFactory(
       new EvmAddress(new Address(this.config.escrowFactoryAddress))
     ).getSrcEscrowAddress(immutables, new EvmAddress(implementation));
+  }
+
+  /**
+   * Complete destination escrow withdrawal using calculated address
+   */
+  async withdrawFromDstEscrow(
+    escrowAddress: string,
+    wallet: Wallet,
+    orderHash: string,
+    hashLock: string,
+    maker: bigint,
+    token: bigint,
+    amount: bigint,
+    timeLocks: TimeLocks,
+    safetyDeposit: bigint,
+    secret: string,
+    deployedAt: bigint
+  ): Promise<WithdrawResult> {
+    const tl = timeLocks.setDeployedAt(deployedAt).build();
+
+    const tx: TransactionRequest = {
+      to: this.config.resolverProxyAddress,
+      data: this.resolverInterface.encodeFunctionData("withdraw", [
+        escrowAddress,
+        secret,
+        {
+          orderHash: orderHash,
+          hashlock: hashLock,
+          maker: maker,
+          taker: this.config.resolverProxyAddress,
+          token: token,
+          amount,
+          safetyDeposit,
+          timelocks: tl,
+        },
+      ]),
+    };
+
+    // Execute withdrawal
+    const { txHash, blockTimestamp, blockHash } = await this.executeTransaction(
+      wallet,
+      tx
+    );
+
+    return {
+      transactionHash: txHash,
+      blockHash,
+      blockTimestamp,
+    };
+  }
+
+  /**
+   * Streamlined method to create destination escrow using OrderConfig
+   */
+  async createDestinationEscrowFromOrder(
+    wallet: Wallet,
+    orderConfig: OrderConfig
+  ) {
+    const orderHash = zeroPadValue(toBeHex(orderConfig.order_hash!), 32);
+    const hashLock = zeroPadValue(toBeHex(orderConfig.hashlock.toString()), 32);
+    const maker = BigInt(orderConfig.receiver_address!.toString());
+    const token = BigInt(orderConfig.taker_asset!.toString());
+    const amount = orderConfig.taking_amount!;
+    const timeLocks = orderConfig.timeLocks;
+    const safetyDeposit = orderConfig.dstSafetyDeposit;
+
+    return this.createDestinationEscrow(
+      wallet,
+      orderHash,
+      hashLock,
+      maker,
+      token,
+      amount,
+      timeLocks,
+      safetyDeposit
+    );
+  }
+
+  /**
+   * Streamlined method to withdraw from destination escrow using OrderConfig
+   */
+  async withdrawFromDstEscrowWithOrder(
+    escrowAddress: string,
+    wallet: Wallet,
+    orderConfig: OrderConfig,
+    secret: string,
+    deployedAt: bigint
+  ) {
+    const orderHash = zeroPadValue(toBeHex(orderConfig.order_hash!), 32);
+    const hashLock = zeroPadValue(toBeHex(orderConfig.hashlock.toString()), 32);
+    const maker = BigInt(orderConfig.receiver_address!.toString());
+    const token = BigInt(orderConfig.taker_asset!.toString());
+    const amount = orderConfig.taking_amount!;
+    const timeLocks = orderConfig.timeLocks;
+    const safetyDeposit = orderConfig.dstSafetyDeposit;
+
+    return this.withdrawFromDstEscrow(
+      escrowAddress,
+      wallet,
+      orderHash,
+      hashLock,
+      maker,
+      token,
+      amount,
+      timeLocks,
+      safetyDeposit,
+      secret,
+      deployedAt
+    );
   }
 }
