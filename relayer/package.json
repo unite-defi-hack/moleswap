@@ -14,7 +14,7 @@
     "migrate": "knex migrate:latest",
     "migrate:make": "knex migrate:make",
     "seed": "knex seed:run",
-    "create-order": "ts-node scripts/create-order.ts",
+    "send-order": "ts-node scripts/send-order-to-relayer.ts",
     "cleanup-db": "ts-node scripts/cleanup-db.ts"
   },
   "keywords": [

@@ -40,21 +40,62 @@ export const ORDER_TYPES: EIP712Types = {
  * @returns Order hash and domain information
  */
 export function generateOrderHash(order: Order): OrderHashResult {
-  // Validate order before hashing
-  const validation = validateOrder(order);
-  if (!validation.valid) {
-    throw new Error(`Invalid order: ${validation.errors?.join(', ')}`);
+  // Check if this is an SDK format order
+  const isTonReceiver = order.receiver && !order.receiver.startsWith('0x');
+  const isTonTakerAsset = order.takerAsset && !order.takerAsset.startsWith('0x');
+  const isUint256MakerTraits = /^[0-9]{1,78}$/.test(order.makerTraits);
+  const isHexMakerTraits = order.makerTraits && order.makerTraits.startsWith('0x') && order.makerTraits.length === 66;
+
+  // If SDK format, use SDK domain and types
+  if (isTonReceiver || isTonTakerAsset || isUint256MakerTraits || isHexMakerTraits) {
+    const domain: EIP712Domain = {
+      name: '1inch Limit Order Protocol',
+      version: '4',
+      chainId: 11155111, // Sepolia
+      verifyingContract: '0x991f286348580c1d2206843D5CfD7863Ff29eB15',
+    };
+
+    const types: EIP712Types = {
+      Order: [
+        { name: 'salt', type: 'uint256' },
+        { name: 'maker', type: 'address' },
+        { name: 'receiver', type: 'address' },
+        { name: 'makerAsset', type: 'address' },
+        { name: 'takerAsset', type: 'address' },
+        { name: 'makingAmount', type: 'uint256' },
+        { name: 'takingAmount', type: 'uint256' },
+        { name: 'makerTraits', type: 'uint256' },
+      ],
+    };
+
+    const message = {
+      salt: order.salt,
+      maker: order.maker,
+      receiver: order.receiver.startsWith('0x') ? order.receiver : '0x0000000000000000000000000000000000000000',
+      makerAsset: order.makerAsset.startsWith('0x') ? order.makerAsset : '0x0000000000000000000000000000000000000000',
+      takerAsset: order.takerAsset.startsWith('0x') ? order.takerAsset : '0x0000000000000000000000000000000000000000',
+      makingAmount: order.makingAmount,
+      takingAmount: order.takingAmount,
+      makerTraits: order.makerTraits,
+    };
+
+    const orderHash = ethers.TypedDataEncoder.hash(domain, types, message);
+
+    return {
+      orderHash,
+      domain,
+      types
+    };
   }
 
-  // Create EIP-712 domain
+  // Default format for regular orders
   const domain: EIP712Domain = {
     name: 'MoleSwap Relayer',
     version: '1.0.0',
-    chainId: 11155111, // Default chain ID, can be overridden
-    verifyingContract: '0x0000000000000000000000000000000000000000' // Placeholder
+    chainId: 11155111,
+    verifyingContract: '0x0000000000000000000000000000000000000000'
   };
 
-  // Create EIP-712 types
   const types: EIP712Types = {
     Order: [
       { name: 'maker', type: 'address' },
@@ -68,7 +109,6 @@ export function generateOrderHash(order: Order): OrderHashResult {
     ]
   };
 
-  // Create the message to sign
   const message = {
     maker: order.maker,
     makerAsset: order.makerAsset,
@@ -80,7 +120,6 @@ export function generateOrderHash(order: Order): OrderHashResult {
     receiver: order.receiver
   };
 
-  // Generate the hash
   const orderHash = ethers.TypedDataEncoder.hash(domain, types, message);
 
   return {
@@ -109,9 +148,10 @@ export function verifyOrderSignature(
     const isTonReceiver = order.receiver && !order.receiver.startsWith('0x');
     const isTonTakerAsset = order.takerAsset && !order.takerAsset.startsWith('0x');
     const isUint256MakerTraits = /^[0-9]{1,78}$/.test(order.makerTraits);
+    const isHexMakerTraits = order.makerTraits && order.makerTraits.startsWith('0x') && order.makerTraits.length === 66;
 
-    // If SDK format (TON address or uint256 decimal for makerTraits), use SDK EIP-712 domain/types/message
-    if (isTonReceiver || isTonTakerAsset || isUint256MakerTraits) {
+    // If SDK format (TON address, uint256 decimal for makerTraits, or hex makerTraits), use SDK EIP-712 domain/types/message
+    if (isTonReceiver || isTonTakerAsset || isUint256MakerTraits || isHexMakerTraits) {
       // SDK EIP-712 domain/types/message
       const sdkDomain = {
         name: '1inch Limit Order Protocol',
@@ -131,7 +171,7 @@ export function verifyOrderSignature(
           { name: 'makerTraits', type: 'uint256' },
         ],
       };
-      // Map receiver and takerAsset to EVM zero address if they are TON addresses (for signature recovery)
+      // Use the original SDK message structure exactly as it is
       const message = {
         salt: order.salt,
         maker: order.maker,

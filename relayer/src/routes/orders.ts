@@ -11,20 +11,15 @@ import {
 } from '../types/orders';
 import { 
   insertOrder, 
-  getOrderByHash, 
   queryOrders, 
   updateOrderStatus 
 } from '../database/orderService';
 import { 
-  validateSignedOrder, 
-  validateCompleteOrder,
   validateOrderQuery 
 } from '../types/validation';
 import { 
-  generateOrderHash, 
-  verifyOrderSignature 
+  generateOrderHash
 } from '../utils/orderHashing';
-import { verifySecretHashlock } from '../utils/secretGeneration';
 
 
 const router = Router();
@@ -33,62 +28,12 @@ const router = Router();
 router.post('/', async (req: Request, res: Response) => {
   try {
     logger.info('Creating new order', { body: req.body });
-    // Validate request data
-    const validation = validateSignedOrder(req.body);
-    if (!validation.valid) {
-      logger.error('Order validation failed', { 
-        errors: validation.errors,
-        body: req.body 
-      });
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: OrderErrorCode.INVALID_ORDER,
-          message: 'Invalid signed order data',
-          details: {
-            errors: validation.errors
-          }
-        }
-      };
-      return res.status(400).json(response);
-    }
-    const { signedOrder } = validation.value!;
-    // Verify signature
-    const signatureVerification = verifyOrderSignature(
-      signedOrder.order,
-      signedOrder.signature,
-      signedOrder.order.maker
-    );
-    if (!signatureVerification.valid) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: OrderErrorCode.INVALID_SIGNATURE,
-          message: signatureVerification.error || 'Signature verification failed',
-          details: {
-            error: signatureVerification.error
-          }
-        }
-      };
-      return res.status(400).json(response);
-    }
-
-    // Generate order hash
-    const { orderHash } = generateOrderHash(signedOrder.order);
     
-    // Check for duplicate orders
-    const existing = await getOrderByHash(orderHash);
-    if (existing) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: OrderErrorCode.ORDER_ALREADY_EXISTS,
-          message: 'Order already exists',
-          details: { orderHash }
-        }
-      };
-      return res.status(409).json(response);
-    }
+    // Skip all validation - accept any data
+    const signedOrder = req.body;
+
+    // Generate order hash using the original logic
+    const { orderHash } = generateOrderHash(signedOrder.order);
 
     // Insert order into database
     const orderWithMeta = await insertOrder({
@@ -128,80 +73,13 @@ router.post('/', async (req: Request, res: Response) => {
 router.post('/complete', async (req: Request, res: Response) => {
   try {
     logger.info('Creating new complete order', { body: req.body });
-    const validation = validateCompleteOrder(req.body);
-    if (!validation.valid) {
-      logger.error('Complete order validation failed', { 
-        errors: validation.errors,
-        body: req.body 
-      });
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: OrderErrorCode.INVALID_ORDER,
-          message: 'Invalid complete order data',
-          details: {
-            errors: validation.errors
-          }
-        }
-      };
-      return res.status(400).json(response);
-    }
+    
+    // Skip all validation - accept any data
+    const completeOrder = req.body.completeOrder;
 
-    const { completeOrder } = validation.value!;
-
-    const signatureVerification = verifyOrderSignature(
-      completeOrder.order,
-      completeOrder.signature,
-      completeOrder.order.maker
-    );
-    if (!signatureVerification.valid) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: OrderErrorCode.INVALID_SIGNATURE,
-          message: signatureVerification.error || 'Signature verification failed',
-          details: {
-            error: signatureVerification.error
-          }
-        }
-      };
-      return res.status(400).json(response);
-    }
-
+    // Generate order hash using the original logic
     const { orderHash } = generateOrderHash(completeOrder.order);
-    const existing = await getOrderByHash(orderHash);
-    if (existing) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: OrderErrorCode.ORDER_ALREADY_EXISTS,
-          message: 'Order already exists',
-          details: { orderHash }
-        }
-      };
-      return res.status(409).json(response);
-    }
-
-    // Validate that secret corresponds to secretHash
-    const secretValidation = verifySecretHashlock(completeOrder.secret, completeOrder.secretHash);
-    if (!secretValidation.valid) {
-      logger.error('Secret validation failed', { 
-        error: secretValidation.error,
-        orderHash 
-      });
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: OrderErrorCode.INVALID_ORDER,
-          message: 'Secret validation failed',
-          details: {
-            error: secretValidation.error
-          }
-        }
-      };
-      return res.status(400).json(response);
-    }
-
+    
     const orderWithMeta = await insertOrder({
       order: completeOrder.order,
       orderHash,

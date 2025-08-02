@@ -173,6 +173,24 @@ class ExactMakerDepositTest {
       hashlock: secretHash,
       orderHash: order.getOrderHash(this.config.crossChain.sourceNetworkId),
       expirationTime: new Date(Number(order.deadline) * 1000).toISOString(),
+      // Additional metadata for comparison with create-order script
+      metadata: {
+        maker: this.makerWallet.address,
+        taker: this.takerWallet.address,
+        nonce: nonce.toString(),
+        chainIds: {
+          source: this.config.crossChain.sourceNetworkId,
+          destination: this.config.crossChain.destinationNetworkId,
+        },
+        amounts: {
+          making: MAKING_AMOUNT.toString(),
+          taking: TAKING_AMOUNT.toString(),
+        },
+        safetyDeposits: {
+          source: SRC_SAFETY_DEPOSIT.toString(),
+          destination: DST_SAFETY_DEPOSIT.toString(),
+        },
+      }
     };
 
     console.log('✍️ Order signed successfully:', {
@@ -181,6 +199,19 @@ class ExactMakerDepositTest {
     });
 
     return output;
+  }
+
+  /**
+   * Print order in JSON format for comparison with create-order script
+   */
+  printOrderAsJson(orderData: any): void {
+    console.log('\n📄 Order JSON Output (from test-deposit-exact-maker):');
+    console.log('='.repeat(60));
+    console.log(JSON.stringify(orderData, null, 2));
+    console.log('='.repeat(60));
+    console.log('\n✅ Order JSON printed successfully!');
+    console.log(`📋 Order Hash: ${orderData.orderHash}`);
+    console.log(`⏰ Expires: ${orderData.expirationTime}`);
   }
 
   /**
@@ -247,6 +278,30 @@ class ExactMakerDepositTest {
   }
 
   /**
+   * Run only order creation and print JSON (for comparison with create-order script)
+   */
+  async runOrderCreationOnly(): Promise<void> {
+    console.log('🚀 Starting Order Creation Only (for JSON comparison)');
+    console.log('=====================================================');
+
+    try {
+      // Step 1: Create order with maker wallet
+      const orderData = await this.createOrder();
+      console.log('✅ Step 1: Order created successfully');
+
+      // Step 2: Print order in JSON format
+      this.printOrderAsJson(orderData);
+      console.log('✅ Step 2: Order JSON printed successfully');
+
+      console.log('\n✅ Order creation test completed successfully!');
+      
+    } catch (error) {
+      console.error('❌ Test failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Run the complete test
    */
   async  run(): Promise<void> {
@@ -264,16 +319,19 @@ class ExactMakerDepositTest {
       const orderData = await this.createOrder();
       console.log('✅ Step 1: Order created successfully');
 
-      // Step 2: Wait for one block (like working example)
+      // Step 2: Print order in JSON format for comparison
+      this.printOrderAsJson(orderData);
+
+      // Step 3: Wait for one block (like working example)
       // due to LOP check allowedTime > block.timestamp
       console.log(
         'Waiting for one block - before "resolver" starts to execute order'
       );
       await new Promise((resolve) => setTimeout(resolve, 10000));
 
-      // Step 3: Test deposit with taker wallet
+      // Step 4: Test deposit with taker wallet
       await this.testDeposit(orderData);
-      console.log('✅ Step 3: Deposit completed successfully');
+      console.log('✅ Step 4: Deposit completed successfully');
 
       console.log('\n✅ Exact maker test completed successfully!');
       
@@ -287,7 +345,16 @@ class ExactMakerDepositTest {
 // Main execution
 async function main() {
   const test = new ExactMakerDepositTest();
-  await test.run();
+  
+  // Check if we want to run only order creation for JSON comparison
+  const args = process.argv.slice(2);
+  const orderOnly = args.includes('--order-only');
+  
+  if (orderOnly) {
+    await test.runOrderCreationOnly();
+  } else {
+    await test.run();
+  }
 }
 
 // Run if this file is executed directly

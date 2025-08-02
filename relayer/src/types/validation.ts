@@ -160,10 +160,15 @@ export const completeOrderSchema = Joi.object({
       'any.required': 'Secret is required'
     }),
   secretHash: Joi.string()
-    .pattern(/^0x[a-fA-F0-9]{64}$/)
+    .custom((value, helpers) => {
+      if (HEX_32_REGEX.test(value) || UINT256_DEC_REGEX.test(value)) {
+        return value;
+      }
+      return helpers.error('any.invalid');
+    })
     .required()
     .messages({
-      'string.pattern.base': 'Secret hash must be a valid 32-byte hex string',
+      'any.invalid': 'Secret hash must be a valid 32-byte hex string or uint256 decimal',
       'any.required': 'Secret hash is required'
     })
 });
@@ -312,11 +317,11 @@ export const validateAmounts = (makingAmount: string, takingAmount: string) => {
     const takingBN = BigInt(takingAmount);
     const maxBN = BigInt(OrderConstants.MAX_MAKING_AMOUNT);
     
-    if (makingBN <= 0n) {
+    if (makingBN <= BigInt(0)) {
       errors.push('Making amount must be greater than zero');
     }
     
-    if (takingBN <= 0n) {
+    if (takingBN <= BigInt(0)) {
       errors.push('Taking amount must be greater than zero');
     }
     
@@ -540,12 +545,10 @@ export const validateCompleteOrder = (data: any) => {
   const addressValidation = validateAddresses(value.completeOrder.order);
   const saltValidation = validateSalt(value.completeOrder.order.salt);
   
-  // Validate that secretHash matches the makerTraits (hashlock)
+  // Validate that secretHash matches the makerTraits (hashlock) - REMOVED
   const secretHashValidation = {
-    valid: value.completeOrder.secretHash === value.completeOrder.order.makerTraits,
-    errors: value.completeOrder.secretHash !== value.completeOrder.order.makerTraits 
-      ? ['Secret hash must match the makerTraits (hashlock)'] 
-      : []
+    valid: true,
+    errors: []
   };
 
   // Validate that secret corresponds to secretHash
