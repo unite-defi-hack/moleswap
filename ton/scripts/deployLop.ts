@@ -22,6 +22,7 @@ export async function run(provider: NetworkProvider) {
         ),
     );
 
+    // Latest LOP (testnet): kQC1aDFOh0byjKgc6rnj_0nicgUm5qbM2giSzDouGR-SRBQE
     ui.write('Deploy LimitOrderProtocol contract');
 
     await lopSC.sendDeploy(provider.sender(), toNano('0.05'));

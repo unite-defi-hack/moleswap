@@ -1,11 +1,11 @@
 {
     "maker_address": "0QAb-LcZH2MIPwHmQC3nb1lWNOms7OqJJGbXJpGEkwX-JXHz",
-    "maker_asset": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
-    "making_amount": 100000000,
+    "maker_asset": "kQCG_MZJ7nMmnzvaUPkGE0RA5XV2mC0MDu2ekIblSsGnl-jx",
+    "making_amount": 1000000000,
     "receiver_address": "0x1111111111111111111111111111111111111111",
     "taker_asset": "0x3333333333333333333333333333333333333333",
     "taking_amount": 200000000,
     "salt": 1234567890,
-    "creation_time": "2025-07-28T00:00:00.000Z",
-    "expiration_time": "2025-07-31T00:00:00.000Z"
+    "creation_time": "2025-08-02T00:00:00.000Z",
+    "expiration_time": "2025-08-10T00:00:00.000Z"
 }
