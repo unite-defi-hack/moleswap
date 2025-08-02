@@ -192,4 +192,27 @@ describe('DstEscrow', () => {
         expect(await receiver.getBalance()).toBeGreaterThanOrEqual(receiverBalanceBefore + order.taking_amount);
         expect(await someUser.getBalance()).toBeGreaterThanOrEqual(userBalanceBefore + deposit);
     });
+
+    it('taker should cancel dst escrow successful and receive ton back', async () => {
+        const { dstEscrow } = await createDstEscrow(order, timelocks);
+        const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrow.address));
+        const takerBalanceBefore = await taker.getBalance();
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.dstCancellation + 1;
+
+        const result = await dstEscrowSC.sendCancel(taker.getSender());
+
+        expect(result.transactions).toHaveTransaction({
+            from: taker.address,
+            to: dstEscrow.address,
+            op: EscrowOp.cancel,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: dstEscrow.address,
+            to: taker.address,
+            success: true,
+        });
+        expect(await taker.getBalance()).toBeGreaterThanOrEqual(takerBalanceBefore + order.taking_amount);
+    });
 });

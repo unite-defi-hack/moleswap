@@ -27,6 +27,10 @@ export async function run(provider: NetworkProvider, args: string[]) {
         const jettonWalletAddr = await jettonMinter.getWalletAddress(provider.sender().address as Address);
         const jettonWallet = provider.open(JettonWallet.createFromAddress(jettonWalletAddr));
 
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(dstEscrowAddress);
+
         await jettonWallet.sendFillOrder(provider.sender(), order, lopSC.address);
     }
 
@@ -48,5 +52,6 @@ function parseOrder(orderJsonPath: string): OrderConfig {
         creation_time: Math.floor(new Date(jsonData.creation_time).getTime() / 1000),
         expiration_time: Math.floor(new Date(jsonData.expiration_time).getTime() / 1000),
         hashlock: BigInt(jsonData.hashlock!!),
+        asset_jetton_address: HOLE_ADDRESS,
     };
 }
