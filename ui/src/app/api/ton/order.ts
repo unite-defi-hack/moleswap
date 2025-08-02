@@ -10,6 +10,7 @@ import {
     EvmAddress,
     TonAddress,
     randBigInt,
+    SupportedChains,
 } from '@1inch/cross-chain-sdk';
 import { 
     generateRandomBigInt, 
@@ -61,7 +62,8 @@ export const createCrossChainOrder = async (
     
     // Determine the correct address types based on order direction
     const isReceiverAddressEvm = receiverAddress.startsWith('0x');
-    const isReceiverAddressTon = receiverAddress.startsWith('EQ') || receiverAddress.startsWith('UQ');
+    const tonPrefixes = ['EQ', 'UQ', 'kQ', '0Q', 'KQ'];
+    const isReceiverAddressTon = tonPrefixes.some(prefix => receiverAddress.startsWith(prefix));
     
     if (!isReceiverAddressEvm && !isReceiverAddressTon) {
         throw new Error('Invalid address format. Address must be either EVM (0x...) or TON (EQ.../UQ...) format.');
