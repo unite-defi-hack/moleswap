@@ -47,54 +47,7 @@ export function initMoleswapConfig(): MoleswapConfig {
 
   validateConfig(config);
 
-  const chainsToAdd = [config.sourceChainId, config.destinationChainId];
-  chainsToAdd.forEach((chainId) => {
-    if (!(SupportedChains as readonly number[]).includes(chainId)) {
-      (SupportedChains as unknown as number[]).push(chainId);
-    }
-  });
-
-  TRUE_ERC20[config.sourceChainId] = new EvmAddress(
-    new Address(config.trueTokenAddress)
-  );
-
   return config;
-}
-
-export async function signOrderWithCustomLop(
-  order: EvmCrossChainOrder,
-  signer: Wallet,
-  config: MoleswapConfig
-): Promise<string> {
-  const { buildOrderTypedData } = await import("@1inch/limit-order-sdk");
-
-  const typedData = buildOrderTypedData(
-    config.sourceChainId,
-    config.lopAddress,
-    "1inch Limit Order Protocol",
-    "4",
-    order.build()
-  );
-
-  const domainForSignature = {
-    ...typedData.domain,
-    chainId: config.sourceChainId,
-  };
-
-  const signature = await signer.signTypedData(
-    domainForSignature,
-    { Order: typedData.types.Order },
-    typedData.message
-  );
-
-  (order as any).getOrderHash = (_srcChainId: number) =>
-    ethers.TypedDataEncoder.hash(
-      domainForSignature,
-      { Order: typedData.types.Order },
-      typedData.message
-    );
-
-  return signature;
 }
 
 /**

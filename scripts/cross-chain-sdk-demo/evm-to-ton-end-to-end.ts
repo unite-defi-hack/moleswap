@@ -16,7 +16,7 @@ import {
 import {
   initMoleswapConfig,
   MoleswapConfig,
-  signOrderWithCustomLop,
+  // signOrderWithCustomLop,
 } from "./lib/config";
 import { EvmAdapter, DepositResult, WithdrawResult } from "./lib/evmAdapter";
 import {
@@ -112,7 +112,16 @@ async function createOrder(config: MoleswapConfig, maker: Wallet) {
   // 5. Sign the order (EIP-712) -------------------------------------------------
   // ----------------------------------------------------------------------------
   // Use abstracted signing function that handles domain consistency
-  const signature = await signOrderWithCustomLop(order, maker, config);
+  // const signature = await signOrderWithCustomLop(order, maker, config);
+
+  const typedData = order.getTypedData(config.sourceChainId);
+  console.log("typedData", typedData);
+
+  const signature = await maker.signTypedData(
+    typedData.domain,
+    { Order: typedData.types.Order },
+    typedData.message
+  );
 
   const output = {
     order: order.build(),
