@@ -61,6 +61,7 @@ describe('DstEscrow', () => {
             taker_asset: HOLE_ADDRESS,
             taking_amount: toNano('200'),
             taker_address: taker.address,
+            asset_jetton_address: HOLE_ADDRESS,
         };
     });
 

@@ -60,6 +60,7 @@ describe('SrcEscrow', () => {
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+            asset_jetton_address: HOLE_ADDRESS,
         };
     });
 

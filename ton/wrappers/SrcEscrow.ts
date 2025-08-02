@@ -80,6 +80,11 @@ export class SrcEscrow implements Contract {
                         .storeUint(order.taking_amount, 128)
                         .endCell(),
                 )
+                .storeRef(
+                    beginCell()
+                        .storeAddress(order.asset_jetton_address as Address)
+                        .endCell(),
+                )
                 .endCell(),
         });
     }
@@ -179,6 +184,7 @@ export class SrcEscrow implements Contract {
             receiverAddress: result.stack.readBigNumber(),
             takerAssetAddress: result.stack.readBigNumber(),
             takerAssetAmount: result.stack.readBigNumber(),
+            assetJettonAddress: result.stack.readAddress(),
         };
     }
 

@@ -81,6 +81,11 @@ export class DstEscrow implements Contract {
                         .storeCoins(order.taking_amount)
                         .endCell(),
                 )
+                .storeRef(
+                    beginCell()
+                        .storeAddress(order.asset_jetton_address as Address)
+                        .endCell(),
+                )
                 .endCell(),
         });
     }

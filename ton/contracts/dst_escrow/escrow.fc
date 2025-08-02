@@ -52,7 +52,8 @@ const operational_fees = 1000000;  ;; 0.001 TON
         storage::taker_asset_addr = taker_cs~load_msg_addr();
         storage::taker_asset_amount = taker_cs~load_coins();
 
-        storage::asset_jetton_address = empty_slice(); ;; used for jettons orders only
+        slice ds_jetton = (in_msg_body~load_ref()).begin_parse();
+        storage::asset_jetton_address = ds_jetton~load_msg_addr();
 
         throw_unless(error::expired, now() < storage::expiration_time);
         throw_unless(error::not_ready, now() >= storage::creation_time);

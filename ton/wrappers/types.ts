@@ -13,6 +13,7 @@ export type OrderConfig = {
     taker_asset: bigint | Address;
     taking_amount: bigint;
     salt: bigint;
+    asset_jetton_address: Address;
 };
 
 export type TimelocksConfig = {

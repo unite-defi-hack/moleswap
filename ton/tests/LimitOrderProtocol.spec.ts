@@ -79,6 +79,7 @@ describe('Limit order protocol', () => {
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+            asset_jetton_address: HOLE_ADDRESS,
         };
         dstOrder = {
             maker_address: ethAddressToBigInt('0x1111111111111111111111111111111111111111'),
@@ -92,6 +93,7 @@ describe('Limit order protocol', () => {
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
+            asset_jetton_address: HOLE_ADDRESS,
         };
     });
 
@@ -258,6 +260,7 @@ describe('Limit order protocol', () => {
         expect(orderData.receiverAddress).toEqual(srcOrder.receiver_address);
         expect(orderData.takerAssetAddress).toEqual(srcOrder.taker_asset);
         expect(orderData.takerAssetAmount).toEqual(srcOrder.taking_amount);
+        expect(orderData.assetJettonAddress.toString()).toEqual(HOLE_ADDRESS.toString());
     });
 
     it('taker should fill order successful', async () => {
@@ -288,10 +291,12 @@ describe('Limit order protocol', () => {
 
     it('create a new order with jetton successful', async () => {
         const order = { ...srcOrder, maker_asset: await jettonMinter.getWalletAddress(lopSC.address) };
-        const result = await createJettonOrder(order);
-
         const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
         const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(srcEscrowAddress);
+
+        const result = await createJettonOrder(order);
+
         expect(result.transactions).toHaveTransaction({
             from: lopSC.address,
             to: srcEscrowAddress,
@@ -311,6 +316,7 @@ describe('Limit order protocol', () => {
         expect(orderData.receiverAddress).toEqual(order.receiver_address);
         expect(orderData.takerAssetAddress).toEqual(order.taker_asset);
         expect(orderData.takerAssetAmount).toEqual(order.taking_amount);
+        expect(orderData.assetJettonAddress.toString()).toEqual(order.asset_jetton_address.toString());
     });
 
     it('fill existing order with jetton successful', async () => {
