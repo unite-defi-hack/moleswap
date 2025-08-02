@@ -12,7 +12,7 @@ export type OrderConfig = {
     taker_address?: bigint | Address;
     taker_asset: bigint | Address;
     taking_amount: bigint;
-    salt?: bigint;
+    salt: bigint;
 };
 
 export type TimelocksConfig = {

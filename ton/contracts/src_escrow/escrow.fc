@@ -10,6 +10,7 @@
 
 const exec_fee = 30000000;  ;; 0.03 TON
 const min_security_deposit = 100000000;  ;; 0.1 TON
+const operational_fees = 1000000;  ;; 0.001 TON
 
 
 () recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
@@ -60,6 +61,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
     }
 
     if (op == op::claim) {
+        throw_unless(error::already_claimed, slice_empty?(storage::taker_src_addr));
         throw_unless(error::not_enough_ton, msg_value > min_security_deposit + exec_fee);
         throw_unless(error::expired, now() < storage::expiration_time);
 
@@ -110,7 +112,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         int secret = in_msg_body~load_uint(256);
         validate_secret(secret, storage::hashlock);
 
-        send_ton(storage::taker_src_addr, storage::maker_asset_amount);
+        send_ton(storage::taker_src_addr, storage::maker_asset_amount + operational_fees);
         destruct_and_pay(sender_address);
         return ();
     }
@@ -136,7 +138,7 @@ const min_security_deposit = 100000000;  ;; 0.1 TON
         throw_unless(error::cancelation_phase_not_started,
             now() >= storage::execution_start_time + storage::public_cancellation_timelock);
 
-        send_ton(storage::maker_addr, storage::maker_asset_amount);
+        send_ton(storage::maker_addr, storage::maker_asset_amount + operational_fees);
         destruct_and_pay(sender_address);
         return ();
     }

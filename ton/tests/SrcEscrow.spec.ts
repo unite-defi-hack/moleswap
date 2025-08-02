@@ -239,11 +239,12 @@ describe('SrcEscrow', () => {
         const someUser = await blockchain.treasury('someUser');
         const { srcEscrow } = await createSrcEscrow(order);
         const srcEscrowSC = blockchain.openContract(SrcEscrow.createFromAddress(srcEscrow.address));
-        const takerBalanceBefore = await taker.getBalance();
-        const userBalanceBefore = await someUser.getBalance();
 
         await srcEscrowSC.sendClaim(taker.getSender());
         blockchain.now = Math.floor(Date.now() / 1000) + timelocks.srcPublicWithdrawal + 1;
+
+        const takerBalanceBefore = await taker.getBalance();
+        const userBalanceBefore = await someUser.getBalance();
 
         const result = await srcEscrowSC.sendPublicWithdraw(someUser.getSender(), secret);
 
@@ -262,14 +263,11 @@ describe('SrcEscrow', () => {
         expect(result.transactions).toHaveTransaction({
             from: srcEscrow.address,
             to: taker.address,
-            value: order.making_amount,
+            value: order.making_amount + toNano(0.001),
             success: true,
         });
         const deposit = toNano(0.1);
-        const operationalFees = toNano(0.07);
-        expect(await taker.getBalance()).toBeGreaterThan(
-            takerBalanceBefore + order.making_amount - deposit - operationalFees,
-        );
+        expect(await taker.getBalance()).toBeGreaterThan(takerBalanceBefore + order.making_amount);
         expect(await someUser.getBalance()).toBeGreaterThanOrEqual(userBalanceBefore + deposit);
     });
 
@@ -325,14 +323,11 @@ describe('SrcEscrow', () => {
         expect(result.transactions).toHaveTransaction({
             from: srcEscrow.address,
             to: maker.address,
-            value: order.making_amount,
+            value: order.making_amount + toNano(0.001),
             success: true,
         });
         const deposit = toNano(0.1);
-        const operationalFees = toNano(0.07);
-        expect(await maker.getBalance()).toBeGreaterThan(
-            makerBalanceBefore + order.making_amount - deposit - operationalFees,
-        );
+        expect(await maker.getBalance()).toBeGreaterThan(makerBalanceBefore + order.making_amount);
         expect(await someUser.getBalance()).toBeGreaterThanOrEqual(userBalanceBefore + deposit);
     });
 });

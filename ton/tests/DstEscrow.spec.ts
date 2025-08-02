@@ -31,6 +31,7 @@ describe('DstEscrow', () => {
 
     beforeEach(async () => {
         blockchain = await Blockchain.create();
+        blockchain.now = Math.floor(Date.now() / 1000);
         deployer = await blockchain.treasury('deployer');
         maker = await blockchain.treasury('maker');
         taker = await blockchain.treasury('taker');
@@ -49,6 +50,7 @@ describe('DstEscrow', () => {
         secret = generateRandomBigInt();
         order = {
             order_hash: generateRandomBigInt(),
+            salt: generateRandomBigInt(),
             hashlock: BigInt(ethers.keccak256(ethers.toBeHex(secret))),
             creation_time: Math.floor(Date.now() / 1000),
             expiration_time: Math.floor((Date.now() + 3 * DAY) / 1000),
@@ -86,7 +88,7 @@ describe('DstEscrow', () => {
         });
 
         // create
-        result = await dstEscrow.sendCreate(deployer.getSender(), order, timelocks, order.taking_amount + toNano(0.05));
+        result = await dstEscrow.sendCreate(deployer.getSender(), order, timelocks, order.taking_amount + toNano(0.15));
         expect(result.transactions).toHaveTransaction({
             from: deployer.address,
             to: dstEscrow.address,
@@ -118,6 +120,7 @@ describe('DstEscrow', () => {
         const { dstEscrow } = await createDstEscrow(order, timelocks);
         const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrow.address));
         const receiverBalanceBefore = await receiver.getBalance();
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.dstWithdrawal + 1;
 
         const result = await dstEscrowSC.sendWithdraw(taker.getSender(), secret);
 
@@ -141,6 +144,7 @@ describe('DstEscrow', () => {
         const { dstEscrow } = await createDstEscrow(order, timelocks);
         const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrow.address));
         const receiverBalanceBefore = await receiver.getBalance();
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.dstWithdrawal + 1;
 
         const result = await dstEscrowSC.sendWithdraw(taker.getSender(), wrongSecret);
 
@@ -153,5 +157,38 @@ describe('DstEscrow', () => {
             exitCode: Errors.wrong_secret,
         });
         expect(await receiver.getBalance()).toBeLessThanOrEqual(receiverBalanceBefore);
+    });
+
+    it('any user can make public withdraw from dst escrow when know the secret', async () => {
+        const someUser = await blockchain.treasury('someUser');
+        const { dstEscrow } = await createDstEscrow(order, timelocks);
+        const dstEscrowSC = blockchain.openContract(DstEscrow.createFromAddress(dstEscrow.address));
+        const receiverBalanceBefore = await receiver.getBalance();
+        const userBalanceBefore = await someUser.getBalance();
+        blockchain.now = Math.floor(Date.now() / 1000) + timelocks.dstPublicWithdrawal + 1;
+
+        const result = await dstEscrowSC.sendPublicWithdraw(someUser.getSender(), secret);
+
+        expect(result.transactions).toHaveTransaction({
+            from: someUser.address,
+            to: dstEscrow.address,
+            op: EscrowOp.public_withdraw,
+            destroyed: true,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: dstEscrow.address,
+            to: someUser.address,
+            success: true,
+        });
+        expect(result.transactions).toHaveTransaction({
+            from: dstEscrow.address,
+            to: receiver.address,
+            value: order.taking_amount + toNano(0.001),
+            success: true,
+        });
+        const deposit = toNano(0.1);
+        expect(await receiver.getBalance()).toBeGreaterThanOrEqual(receiverBalanceBefore + order.taking_amount);
+        expect(await someUser.getBalance()).toBeGreaterThanOrEqual(userBalanceBefore + deposit);
     });
 });

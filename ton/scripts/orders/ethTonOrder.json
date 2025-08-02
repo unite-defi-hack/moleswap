@@ -8,6 +8,6 @@
     "taking_amount": 100000000,
     "creation_time": "2025-07-28T00:00:00.000Z",
     "expiration_time": "2025-07-31T00:00:00.000Z",
-    "order_hash": "0xd95c4e1266812c6dad3af0747e903362ea37418cb1f284e39b2b8cbcacb4eaf4",
+    "salt": 1234567890,
     "hashlock": "0xaf5c5c9212dcb3764446c2c5bf47a42ce183974b2d3a08022583aaa4ca125546"
 }

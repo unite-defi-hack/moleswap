@@ -9,8 +9,10 @@
 #pragma version >=0.4.4;
 
 const storage_fee = 5000000; ;; 0.005 TON
-const exec_fee = 30000000;  ;; 0.03 TON
+const exec_fee = 70000000;  ;; 0.07 TON
+const order_exec_fee = 30000000;  ;; 0.03 TON
 const reserve_fee = 1000000;  ;; 0.001 TON
+const min_security_deposit = 100000000;  ;; 0.1 TON
 
 
 () create_src_escrow(
@@ -24,6 +26,8 @@ const reserve_fee = 1000000;  ;; 0.001 TON
     int hashlock,
     int creation_time,
     int expiration_time,
+    slice excesses_addr,
+    slice sender_address,
     int query_id
 ) impure inline {
     raw_reserve(reserve_fee, 4);
@@ -60,7 +64,35 @@ const reserve_fee = 1000000;  ;; 0.001 TON
                 .end_cell()
         )
         .end_cell();
-    send_message_with_stateinit(to_contract_address, msg_body, state_init, 0, CARRY_REMAINING_BALANCE);
+
+    if (address::is_hole(maker_asset)) {
+        send_message_with_stateinit(
+            to_contract_address,
+            msg_body,
+            state_init, 
+            0, 
+            CARRY_REMAINING_BALANCE
+        );
+    } else {
+        send_message_with_stateinit(
+            to_contract_address,
+            msg_body,
+            state_init, 
+            order_exec_fee, 
+            PAY_FEES_SEPARATELY
+        );
+        send_jetton(
+            to_contract_address,
+            making_amount,
+            sender_address,
+            excesses_addr,
+            0,
+            null(),
+            0,
+            query_id,
+            CARRY_REMAINING_BALANCE
+        );
+    }
 }
 
 () create_dst_escrow(
@@ -75,6 +107,8 @@ const reserve_fee = 1000000;  ;; 0.001 TON
     int hashlock,
     int creation_time,
     int expiration_time,
+    slice excesses_addr,
+    slice sender_address,
     int query_id
 ) impure inline {
     raw_reserve(reserve_fee, 4);
@@ -111,10 +145,38 @@ const reserve_fee = 1000000;  ;; 0.001 TON
                 .end_cell()
         )
         .end_cell();
-    send_message_with_stateinit(to_contract_address, msg_body, state_init, 0, CARRY_REMAINING_BALANCE);
+
+    if (address::is_hole(taker_asset)) {
+        send_message_with_stateinit(
+            to_contract_address,
+            msg_body,
+            state_init,
+            0,
+            CARRY_REMAINING_BALANCE
+        );
+    } else {
+        send_message_with_stateinit(
+            to_contract_address,
+            msg_body,
+            state_init,
+            order_exec_fee,
+            PAY_FEES_SEPARATELY
+        );
+        send_jetton(
+            to_contract_address,
+            making_amount,
+            sender_address,
+            excesses_addr,
+            0,
+            null(),
+            0,
+            query_id,
+            CARRY_REMAINING_BALANCE
+        );
+    }
 }
 
-(int) calculate_order_hash(
+(int) calculate_src_order_hash(
     slice maker_address,
     slice maker_asset,
     int making_amount,
@@ -149,6 +211,145 @@ const reserve_fee = 1000000;  ;; 0.001 TON
     return cell_hash(order_data);
 }
 
+(int) calculate_dst_order_hash(
+    int maker_address,
+    int maker_asset,
+    int making_amount,
+    slice receiver_address,
+    slice taker_asset,
+    int taking_amount,
+    int hashlock,
+    int salt,
+    int creation_time,
+    int expiration_time
+) inline {
+    cell order_data = begin_cell()
+        .store_uint(maker_address, 256)
+        .store_uint(maker_asset, 256)
+        .store_uint(making_amount, 128)
+        .store_slice(receiver_address)
+        .store_ref(
+            begin_cell()
+                .store_slice(taker_asset)
+                .store_coins(taking_amount)
+                .end_cell()
+        )
+        .store_ref(
+            begin_cell()
+                .store_uint(hashlock, 256)
+                .store_uint(salt, 256)
+                .store_uint(creation_time, 32)
+                .store_uint(expiration_time, 32)
+                .end_cell()
+        )
+        .end_cell();
+    return cell_hash(order_data);
+}
+
+() create_order(
+    slice maker_address,
+    slice maker_asset,
+    int making_amount,
+    slice cs,
+    slice excesses_addr,
+    slice sender_address,
+    int query_id
+) impure inline {
+    int receiver_address = cs~load_uint(256);
+
+    slice ds_to = (cs~load_ref()).begin_parse();
+    int taker_asset = ds_to~load_uint(256);
+    int taking_amount = ds_to~load_uint(128);
+
+    int salt = ds_to~load_uint(256);
+    int hashlock = ds_to~load_uint(256);
+    int creation_time = ds_to~load_uint(32);
+    int expiration_time = ds_to~load_uint(32);
+
+    ;; not used for now
+    ;; slice maker_traits = in_msg_body~load_ref();
+
+    int order_hash = calculate_src_order_hash(
+        maker_address,
+        maker_asset,
+        making_amount,
+        receiver_address,
+        taker_asset,
+        taking_amount,
+        hashlock,
+        salt,
+        creation_time,
+        expiration_time
+    );
+
+    create_src_escrow(
+        maker_address,
+        maker_asset,
+        making_amount,
+        receiver_address,
+        taker_asset,
+        taking_amount,
+        order_hash,
+        hashlock,
+        creation_time,
+        expiration_time,
+        excesses_addr,
+        sender_address,
+        query_id
+    );
+}
+
+() fill_order(
+    slice taker_address,
+    slice taker_asset,
+    int taking_amount,
+    slice cs,
+    slice excesses_address,
+    slice sender_address,
+    int query_id
+) impure inline {
+    int maker_address = cs~load_uint(256);
+    int maker_asset = cs~load_uint(256);
+    int making_amount = cs~load_uint(128);
+    slice receiver_address = cs~load_msg_addr();
+
+    slice ds_auction = (cs~load_ref()).begin_parse();
+    int salt = ds_auction~load_uint(256);
+    int hashlock = ds_auction~load_uint(256);
+    int creation_time = ds_auction~load_uint(32);
+    int expiration_time = ds_auction~load_uint(32);
+
+    int order_hash = calculate_dst_order_hash(
+        maker_address,
+        maker_asset,
+        making_amount,
+        receiver_address,
+        taker_asset,
+        taking_amount,
+        hashlock,
+        salt,
+        creation_time,
+        expiration_time
+    );
+
+    create_dst_escrow(
+        maker_address,
+        maker_asset,
+        making_amount,
+        receiver_address,
+        taker_address,
+        taker_asset,
+        taking_amount,
+        order_hash,
+        hashlock,
+        creation_time,
+        expiration_time,
+        sender_address,
+        sender_address,
+        query_id
+    );
+}
+
 () recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
     if (in_msg_body.slice_empty?()) { ;; ignore empty messages
         return ();
@@ -169,86 +370,62 @@ const reserve_fee = 1000000;  ;; 0.001 TON
         slice maker_address = in_msg_body~load_msg_addr();
         slice maker_asset = in_msg_body~load_msg_addr();
         int making_amount = in_msg_body~load_coins();
-        int receiver_address = in_msg_body~load_uint(256);
-
-        slice ds_to = (in_msg_body~load_ref()).begin_parse();
-        int taker_asset = ds_to~load_uint(256);
-        int taking_amount = ds_to~load_uint(128);
-
-        int salt = ds_to~load_uint(256);
-        int hashlock = ds_to~load_uint(256);
-        int creation_time = ds_to~load_uint(32);
-        int expiration_time = ds_to~load_uint(32);
-
-        ;; not used for now
-        ;; slice maker_traits = in_msg_body~load_ref();
 
         throw_unless(error::not_enough_ton, msg_value > making_amount + exec_fee);
+        throw_unless(error::invalid_asset_address, address::is_hole(maker_asset));
 
-        int order_hash = calculate_order_hash(
-            maker_address,
-            maker_asset,
-            making_amount,
-            receiver_address,
-            taker_asset,
-            taking_amount,
-            hashlock,
-            salt,
-            creation_time,
-            expiration_time
-        );
-
-        create_src_escrow(
-            maker_address,
-            maker_asset,
-            making_amount,
-            receiver_address,
-            taker_asset,
-            taking_amount,
-            order_hash,
-            hashlock,
-            creation_time,
-            expiration_time,
-            query_id
-        );
-
+        create_order(maker_address, maker_asset, making_amount, in_msg_body, sender_address, sender_address, query_id);
         return ();
     }
 
     if (op == op::fill_order) {
-        int maker_address = in_msg_body~load_uint(256);
-        int maker_asset = in_msg_body~load_uint(256);
-        int making_amount = in_msg_body~load_uint(128);
-        slice receiver_address = in_msg_body~load_msg_addr();
-
         slice ds_to = (in_msg_body~load_ref()).begin_parse();
         slice taker_address = ds_to~load_msg_addr();
         slice taker_asset = ds_to~load_msg_addr();
         int taking_amount = ds_to~load_coins();
 
-        slice ds_auction = (in_msg_body~load_ref()).begin_parse();
-        int order_hash = ds_auction~load_uint(256);
-        int hashlock = ds_auction~load_uint(256);
-        int creation_time = ds_auction~load_uint(32);
-        int expiration_time = ds_auction~load_uint(32);
+        throw_unless(error::not_enough_ton, msg_value > taking_amount + min_security_deposit + exec_fee);
+        throw_unless(error::invalid_asset_address, address::is_hole(taker_asset));
 
-        throw_unless(error::not_enough_ton, msg_value > taking_amount + exec_fee);
-
-        create_dst_escrow(
-            maker_address,
-            maker_asset,
-            making_amount,
-            receiver_address,
-            taker_address,
-            taker_asset,
-            taking_amount,
-            order_hash,
-            hashlock,
-            creation_time,
-            expiration_time,
-            query_id
-        );
+        fill_order(taker_address, taker_asset, taking_amount, in_msg_body, sender_address, sender_address, query_id);
         return ();
+    }
+
+    if (op == op::transfer_notification) {
+        int jetton_amount = in_msg_body~load_coins();
+        slice from_addr = in_msg_body~load_msg_addr();
+        slice fwd_cs = (in_msg_body~load_ref()).begin_parse();
+        int fwd_op = fwd_cs~load_op();
+        int fwd_query_id = fwd_cs~load_query_id();
+        
+        if (fwd_op == op::create_order) {
+            slice maker_address = fwd_cs~load_msg_addr();
+            slice maker_asset = fwd_cs~load_msg_addr();
+            int making_amount = fwd_cs~load_coins();
+
+            throw_unless(error::not_enough_ton, msg_value > exec_fee);
+            throw_unless(error::not_enough_asset, jetton_amount >= making_amount);
+            throw_unless(error::invalid_asset_address, equal_slice_bits(sender_address, maker_asset));
+            throw_unless(error::invalid_asset_address, ~ address::is_hole(maker_asset));
+
+            create_order(maker_address, maker_asset, making_amount, fwd_cs, from_addr, sender_address, query_id);
+            return ();
+        }
+
+        if (fwd_op == op::fill_order) {
+            slice ds_to = (fwd_cs~load_ref()).begin_parse();
+            slice taker_address = ds_to~load_msg_addr();
+            slice taker_asset = ds_to~load_msg_addr();
+            int taking_amount = ds_to~load_coins();
+
+            throw_unless(error::not_enough_ton, msg_value > min_security_deposit + exec_fee);
+            throw_unless(error::not_enough_asset, jetton_amount >= taking_amount);
+            throw_unless(error::invalid_asset_address, equal_slice_bits(sender_address, taker_asset));
+            throw_unless(error::invalid_asset_address, ~ address::is_hole(taker_asset));
+
+            fill_order(taker_address, taker_asset, taking_amount, fwd_cs, sender_address, sender_address, query_id);
+            return ();
+        }
     }
 
     throw(0xffff);

@@ -25,3 +25,11 @@ export const Errors = {
     expired: 408,
     not_implemented: 501,
 };
+
+export const JettonOp = {
+    transfer: 0xf8a7ea5,
+    transfer_notification: 0x7362d09c,
+    internal_transfer: 0x178d4519,
+    excesses: 0xd53276db,
+    mint: 0x1674b0a0,
+};

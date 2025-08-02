@@ -3,7 +3,9 @@ import { join } from 'path';
 import { Address } from '@ton/core';
 import { NetworkProvider } from '@ton/blueprint';
 import { LimitOrderProtocol } from '../wrappers/LimitOrderProtocol';
-import { ethAddressToBigInt } from '../wrappers/utils';
+import { JettonWallet } from '../wrappers/JettonWallet';
+import { JettonMinter } from '../wrappers/JettonMinter';
+import { ethAddressToBigInt, HOLE_ADDRESS } from '../wrappers/utils';
 import { OrderConfig } from '../wrappers/types';
 
 export async function run(provider: NetworkProvider, args: string[]) {
@@ -15,7 +17,18 @@ export async function run(provider: NetworkProvider, args: string[]) {
     const orderJsonPath = join(__dirname, join('orders', 'ethTonOrder.json'));
     const order = parseOrder(orderJsonPath);
 
-    await lopSC.sendFillOrder(provider.sender(), order);
+    if (order.taker_asset === HOLE_ADDRESS) {
+        await lopSC.sendFillOrder(provider.sender(), order);
+    } else {
+        const lopJetton = provider.open(JettonWallet.createFromAddress(order.taker_asset as Address));
+        const { jettonMasterAddress } = await lopJetton.getWalletData();
+        const jettonMinter = provider.open(JettonMinter.createFromAddress(jettonMasterAddress));
+
+        const jettonWalletAddr = await jettonMinter.getWalletAddress(provider.sender().address as Address);
+        const jettonWallet = provider.open(JettonWallet.createFromAddress(jettonWalletAddr));
+
+        await jettonWallet.sendFillOrder(provider.sender(), order, lopSC.address);
+    }
 
     ui.write('Order fill transaction was sent...');
 }
@@ -31,7 +44,7 @@ function parseOrder(orderJsonPath: string): OrderConfig {
         taker_address: Address.parse(jsonData.taker_address),
         taker_asset: Address.parse(jsonData.taker_asset),
         taking_amount: BigInt(jsonData.taking_amount),
-        order_hash: BigInt(jsonData.order_hash),
+        salt: BigInt(jsonData.salt),
         creation_time: Math.floor(new Date(jsonData.creation_time).getTime() / 1000),
         expiration_time: Math.floor(new Date(jsonData.expiration_time).getTime() / 1000),
         hashlock: BigInt(jsonData.hashlock!!),

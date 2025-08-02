@@ -62,7 +62,7 @@ export class LimitOrderProtocol implements Contract {
         provider: ContractProvider,
         via: Sender,
         order: OrderConfig,
-        value: bigint = toNano(0.05),
+        value: bigint = toNano(0.08),
         queryId: number = 0,
     ) {
         return await provider.internal(via, {
@@ -93,7 +93,7 @@ export class LimitOrderProtocol implements Contract {
         provider: ContractProvider,
         via: Sender,
         order: OrderConfig,
-        value: bigint = toNano(0.05),
+        value: bigint = toNano(0.2),
         queryId: number = 0,
     ) {
         return await provider.internal(via, {
@@ -115,7 +115,7 @@ export class LimitOrderProtocol implements Contract {
                 )
                 .storeRef(
                     beginCell()
-                        .storeUint(order.order_hash!!, 256)
+                        .storeUint(order.salt, 256)
                         .storeUint(order.hashlock, 256)
                         .storeUint(order.creation_time, 32)
                         .storeUint(order.expiration_time, 32)
@@ -145,7 +145,7 @@ export class LimitOrderProtocol implements Contract {
         return result.stack.readAddress();
     }
 
-    async calculateOrderHash(order: OrderConfig): Promise<bigint> {
+    static calculateSrcOrderHash(order: OrderConfig): bigint {
         const orderData = beginCell()
             .storeAddress(order.maker_address as Address)
             .storeAddress(order.maker_asset as Address)
@@ -160,7 +160,31 @@ export class LimitOrderProtocol implements Contract {
             .storeRef(
                 beginCell()
                     .storeUint(order.hashlock, 256)
-                    .storeUint(order.salt!!, 256)
+                    .storeUint(order.salt, 256)
+                    .storeUint(order.creation_time, 32)
+                    .storeUint(order.expiration_time, 32)
+                    .endCell(),
+            )
+            .endCell();
+        return BigInt('0x' + orderData.hash().toString('hex'));
+    }
+
+    static calculateDstOrderHash(order: OrderConfig): bigint {
+        const orderData = beginCell()
+            .storeUint(order.maker_address as bigint, 256)
+            .storeUint(order.maker_asset as bigint, 256)
+            .storeUint(order.making_amount, 128)
+            .storeAddress(order.receiver_address as Address)
+            .storeRef(
+                beginCell()
+                    .storeAddress(order.taker_asset as Address)
+                    .storeCoins(order.taking_amount)
+                    .endCell(),
+            )
+            .storeRef(
+                beginCell()
+                    .storeUint(order.hashlock, 256)
+                    .storeUint(order.salt, 256)
                     .storeUint(order.creation_time, 32)
                     .storeUint(order.expiration_time, 32)
                     .endCell(),

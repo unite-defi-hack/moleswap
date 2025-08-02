@@ -1,8 +1,10 @@
 #include "stdlib.fc";
 #include "errors.fc";
 #include "message.fc";
+#include "op_codes.fc";
 
 const UINT32_MAX = 4294967295;
+const HOLE_ADDRESS = "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"a;
 
 int workchain() asm "0 PUSHINT";
 
@@ -32,6 +34,34 @@ int is_resolvable?(slice addr) inline {
     throw_unless(error::wrong_workchain, is_resolvable?(addr));
 }
 
+cell pack_jetton_wallet_data(int balance, slice owner, slice jetton_master) inline {
+    return begin_cell()
+        .store_grams(balance)
+        .store_slice(owner)
+        .store_slice(jetton_master)
+        .end_cell();
+}
+
+cell calculate_jetton_wallet_state_init(slice owner, slice jetton_master, cell code) inline {
+    return begin_cell()
+        .store_uint(0, 1 + 1) ;; split_depth (Maybe = 0) and special (Maybe = 0)
+        .store_maybe_ref(code)
+        .store_maybe_ref(pack_jetton_wallet_data(0, owner, jetton_master))
+        .store_uint(0, 1) ;; libraries - empty cell
+        .end_cell();
+}
+
+(slice) calc_user_wallet(slice owner, slice jetton_master, cell code) inline {
+    return calculate_contract_address(
+        calculate_jetton_wallet_state_init(owner, jetton_master, code)
+    );
+}
+
+(slice, ()) skip_bounce_flag(slice s) impure inline {
+    s~skip_bits(32); ;; 0xFFFFFFFF
+    return (s, ());
+}
+
 () send_ton(slice to_address, int value) impure {
     cell msg = begin_cell()
         .store_msg_flag(msg_flag::bounceable)
@@ -40,6 +70,37 @@ int is_resolvable?(slice addr) inline {
         .store_msgbody_prefix_slice()
         .end_cell();
     send_raw_message(msg, PAY_FEES_SEPARATELY);
+}
+
+() send_jetton(
+    slice recipient_addr,
+    int jettons_amount,
+    slice jetton_addr,
+    slice excesses_addr,
+    int fwd_amount,
+    cell fwd_payload,
+    int msg_value,
+    int query_id,
+    int mode
+) impure inline {
+    cell msg_body = begin_cell()
+        .store_op(op::transfer)
+        .store_query_id(query_id)
+        .store_coins(jettons_amount)
+        .store_slice(recipient_addr)
+        .store_slice(excesses_addr)
+        .store_uint(0, 1)
+        .store_coins(fwd_amount)
+        .store_maybe_ref(fwd_payload)
+        .end_cell();
+
+    cell msg = begin_cell()
+        .store_msg_flag(msg_flag::non_bounceable)
+        .store_slice(jetton_addr)
+        .store_coins(msg_value)
+        .store_msgbody_prefix_ref(msg_body)
+        .end_cell();
+    send_raw_message(msg, mode);
 }
 
 () destruct_and_pay(slice to_address) impure {
@@ -57,4 +118,8 @@ int is_resolvable?(slice addr) inline {
             .store_uint(secret, 256)
             .hash_keccak256();
         throw_unless(error::wrong_secret, calculated_hash == hashlock);
+}
+
+(int) address::is_hole(slice _addr) inline {
+    return equal_slices(_addr, HOLE_ADDRESS);
 }
