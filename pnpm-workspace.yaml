@@ -1,0 +1,3 @@
+packages:
+  - 'ui'
+  - '1inch-cross-chain-sdk'
