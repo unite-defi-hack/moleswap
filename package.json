@@ -1,6 +1,7 @@
 {
   "name": "moleswap-monorepo",
   "private": true,
+  "packageManager": "pnpm@10.10.0",
   "scripts": {
     "build": "pnpm --filter @1inch/cross-chain-sdk build && pnpm --filter ui build",
     "build:sdk": "pnpm --filter @1inch/cross-chain-sdk build",
