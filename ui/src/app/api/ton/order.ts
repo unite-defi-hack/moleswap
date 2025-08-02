@@ -51,7 +51,9 @@ export const createCrossChainOrder = async (
     toAmount: number,
     receiverAddress: string,
     signTypedDataAsync: any,
+    evmAddress: any,
 ): Promise<CrossChainOrder> => {
+    console.log('evm address !!!!!!!!', evmAddress);
     // Determine order direction and chain IDs
     const isTonToEth = fromAsset.network === 608; // TON to ETH
     const isEthToTon = fromAsset.network === 11155111; // ETH to TON
@@ -160,7 +162,7 @@ export const createCrossChainOrder = async (
                 takerAsset: TonAddress.NATIVE,
                 makingAmount: MAKING_AMOUNT,
                 takingAmount: TAKING_AMOUNT,
-                maker: EvmAddress.fromString("0x58b9147c2411F97841b0b53c42777De5502D54c8"), // EVM maker address (placeholder)
+                maker: EvmAddress.fromString(evmAddress), // EVM maker address (placeholder)
                 receiver: new TonAddress(receiverAddress), // TON receiver address
             },
             {

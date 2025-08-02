@@ -69,7 +69,8 @@ export const OrderPanel = () => {
                 receiveAsset,
                 parseFloat(receiveAmount),
                 payAsset.name == 'Ethereum' ? Address.parse(tonConnectUI.account.address).toString({testOnly: true}) : address,
-                signTypedDataAsync
+                signTypedDataAsync,
+                address
             );
 
             setCreatedOrder(order);
