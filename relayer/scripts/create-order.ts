@@ -7,39 +7,62 @@ import { logger } from '../src/utils/logger';
 // Configuration
 const RELAYER_URL = process.env['RELAYER_URL'] || 'http://localhost:3000';
 
-// Real order data matching the 1inch cross-chain SDK format
-const REAL_ORDERS = [
-  {
-    maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
-    makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03',
-    takerAsset: '0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c',
-    makerTraits: '0x00bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b45350',
-    salt: '8055219788148251265908589343240715975237002832007417457800707733977',
-    makingAmount: '1000000000000000000',
-    takingAmount: '2000000000000000000',
-    receiver: '0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb'
-  }
-];
+// Function to generate unique salt
+function generateUniqueSalt(): string {
+  return (BigInt(Date.now()) + BigInt(Math.floor(Math.random() * 1000000))).toString();
+}
 
-// Complete order data with extension, secret, and secretHash
-const COMPLETE_ORDERS = [
-  {
-    order: {
-      maker: "0x71078879cd9a1d7987b74cee6b6c0d130f1a0115",
-      makerAsset: "0x10563e509b718a279de002dfc3e94a8a8f642b03",
-      takerAsset: "0xa3578b35f092dd73eb4d5a9660d3cde8b6a4bf8c",
-      makerTraits: "0x00bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b45350",
-      salt: "8055219788148251265908589343240715975237002832007417457800707733977",
-      makingAmount: "1000000000000000000",
-      takingAmount: "2000000000000000000",
-      receiver: "0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb"
-    },
-    extension: "0x0000010f0000004a0000004a0000004a0000004a000000250000000000000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b688aa0008863b00397a9e212049500000800bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b453500000000000000000000000000000000000000000000000000000000000014a3400000000000000000000000010563e509b718a279de002dfc3e94a8a8f642b03",
-    signature: "", // Will be generated dynamically
-    secret: "0x63b5eefdca0982721a0a673399bef816ee7522a9e77483d14466a666e859f3aa",
-    secretHash: "0x00bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b45350"
-  }
-];
+// Function to generate unique secret
+function generateUniqueSecret(): string {
+  return "0x" + Buffer.from(require('crypto').randomBytes(32)).toString('hex');
+}
+
+// Function to generate unique secret hash
+function generateSecretHash(secret: string): string {
+  return ethers.keccak256(secret);
+}
+
+// Generate unique order data each time
+function generateUniqueOrders() {
+  const uniqueSalt = generateUniqueSalt();
+  const uniqueSecret = generateUniqueSecret();
+  const uniqueSecretHash = generateSecretHash(uniqueSecret);
+  
+  const REAL_ORDERS = [
+    {
+      maker: '0x71078879cd9a1d7987b74cee6b6c0d130f1a0115',
+      makerAsset: '0x10563e509b718a279de002dfc3e94a8a8f642b03', // EVM token address
+      takerAsset: '0x0000000000000000000000000000000000000000', // TON native token (placeholder for TON address)
+      makerTraits: uniqueSecretHash, // Use unique secret hash as makerTraits
+      salt: uniqueSalt,
+      makingAmount: '881220000000000', // 0.00088122 ETH, ~3.31$ (matching the example)
+      takingAmount: '200000000', // 0.2 TON (matching the example)
+      receiver: '0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb' // TON address format
+    }
+  ];
+
+  // Complete order data with extension, secret, and secretHash
+  const COMPLETE_ORDERS = [
+    {
+      order: {
+        maker: "0x71078879cd9a1d7987b74cee6b6c0d130f1a0115",
+        makerAsset: "0x10563e509b718a279de002dfc3e94a8a8f642b03", // EVM token address
+        takerAsset: "0x0000000000000000000000000000000000000000", // TON native token (placeholder for TON address)
+        makerTraits: uniqueSecretHash, // Use unique secret hash as makerTraits
+        salt: uniqueSalt,
+        makingAmount: "881220000000000", // 0.00088122 ETH, ~3.31$ (matching the example)
+        takingAmount: "200000000", // 0.2 TON (matching the example)
+        receiver: "0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb" // TON address format
+      },
+      extension: "0x0000010f0000004a0000004a0000004a0000004a000000250000000000000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b00000000000000688a9ff4000384000000b7dcd034d89bef6429ec80eaf77f8ffb73e5b40b688aa0008863b00397a9e212049500000800bd363c7762ace561ec85a122307bff99ee8832363f26c64e9a1545b1b453500000000000000000000000000000000000000000000000000000000000014a3400000000000000000000000010563e509b718a279de002dfc3e94a8a8f642b03",
+      signature: "", // Will be generated dynamically
+      secret: uniqueSecret,
+      secretHash: uniqueSecretHash
+    }
+  ];
+
+  return { REAL_ORDERS, COMPLETE_ORDERS };
+}
 
 interface RealOrder {
   maker: string;
@@ -314,58 +337,46 @@ async function main() {
     logger.info(`Found ${existingOrders.data?.total || 0} existing orders`);
   }
 
-  // Create new orders
-  logger.info('Creating a single cross-chain order with proper TON receiver...');
-  const createdOrders: string[] = [];
+  // Generate unique order for this run
+  const { COMPLETE_ORDERS } = generateUniqueOrders();
   
-  const order = REAL_ORDERS[0];
-  if (order) {
-    logger.info('Creating cross-chain order with TON receiver...');
-    
-    const result = await client.createOrder(order);
-    if (result.success && result.data?.orderHash) {
-      createdOrders.push(result.data.orderHash);
-      logger.info(`Cross-chain order created with hash: ${result.data.orderHash}`);
-      logger.info(`Order details:`, {
-        maker: order.maker,
-        receiver: order.receiver,
-        makingAmount: order.makingAmount,
-        takingAmount: order.takingAmount
-      });
-      logger.info(`Using TON receiver address for cross-chain testing`);
-    } else {
-      logger.error(`Failed to create cross-chain order:`, result.error);
-    }
-  }
-
-  // Create complete orders with extension, secret, and secretHash
-  logger.info('Creating complete order with extension, secret, and secretHash...');
+  // Create a single complete order
+  logger.info('Creating a single complete EVM-to-TON cross-chain order...');
   const createdCompleteOrders: string[] = [];
   
   const completeOrder = COMPLETE_ORDERS[0];
   if (completeOrder) {
-    logger.info('Creating complete cross-chain order with TON receiver...');
+    logger.info('Creating complete EVM-to-TON cross-chain order...');
+    logger.info(`Using unique salt: ${completeOrder.order.salt}`);
+    logger.info(`Using unique secret: ${completeOrder.secret}`);
+    logger.info(`Using unique secret hash: ${completeOrder.secretHash}`);
     
     const result = await client.createCompleteOrder(completeOrder);
     if (result.success && result.data?.orderHash) {
       createdCompleteOrders.push(result.data.orderHash);
-      logger.info(`Complete cross-chain order created with hash: ${result.data.orderHash}`);
+      logger.info(`Complete EVM-to-TON cross-chain order created with hash: ${result.data.orderHash}`);
       logger.info(`Complete order details:`, {
         maker: completeOrder.order.maker,
+        makerAsset: completeOrder.order.makerAsset,
+        takerAsset: completeOrder.order.takerAsset,
         receiver: completeOrder.order.receiver,
         makingAmount: completeOrder.order.makingAmount,
-        takingAmount: completeOrder.order.takingAmount
+        takingAmount: completeOrder.order.takingAmount,
+        salt: completeOrder.order.salt,
+        makerTraits: completeOrder.order.makerTraits,
+        secret: completeOrder.secret,
+        secretHash: completeOrder.secretHash
       });
-      logger.info(`Using TON receiver address for cross-chain testing`);
+      logger.info(`Complete EVM token -> TON native token cross-chain order`);
     } else {
-      logger.error(`Failed to create complete cross-chain order:`, result.error);
+      logger.error(`Failed to create complete EVM-to-TON cross-chain order:`, result.error);
     }
   }
 
-  // Test secret request with one of the created orders
-  if (createdOrders.length > 0) {
+  // Test secret request with the created complete order
+  if (createdCompleteOrders.length > 0) {
     logger.info('Testing secret request...');
-    const testOrderHash = createdOrders[0];
+    const testOrderHash = createdCompleteOrders[0];
     
     if (testOrderHash) {
       const secretRequest = await client.requestSecret(testOrderHash, {
@@ -412,4 +423,4 @@ if (require.main === module) {
   });
 }
 
-export { RelayerClient, REAL_ORDERS, COMPLETE_ORDERS }; 
+export { RelayerClient, generateUniqueOrders }; 
