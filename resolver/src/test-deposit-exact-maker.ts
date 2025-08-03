@@ -1,6 +1,8 @@
 import "dotenv/config";
 import { randomBytes } from "crypto";
 import { Wallet, JsonRpcProvider } from "ethers";
+import { writeFileSync } from "fs";
+import { join } from "path";
 import {
   Address,
   HashLock,
@@ -215,6 +217,26 @@ class ExactMakerDepositTest {
   }
 
   /**
+   * Save order to JSON file
+   */
+  saveOrderToFile(orderData: any, filename?: string): void {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const defaultFilename = `order-${orderData.orderHash}-${timestamp}.json`;
+    const finalFilename = filename || defaultFilename;
+    
+    const filePath = join(process.cwd(), finalFilename);
+    
+    try {
+      writeFileSync(filePath, JSON.stringify(orderData, null, 2), 'utf8');
+      console.log(`💾 Order saved to file: ${filePath}`);
+      console.log(`📁 File size: ${JSON.stringify(orderData).length} bytes`);
+    } catch (error) {
+      console.error('❌ Failed to save order to file:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Test deposit with the created order using taker wallet
    */
   async testDeposit(orderData: any): Promise<void> {
@@ -346,14 +368,62 @@ class ExactMakerDepositTest {
 async function main() {
   const test = new ExactMakerDepositTest();
   
-  // Check if we want to run only order creation for JSON comparison
+  // Parse command line arguments
   const args = process.argv.slice(2);
   const orderOnly = args.includes('--order-only');
+  const saveToFile = args.includes('--save-to-file');
+  const filename = args.find(arg => arg.startsWith('--filename='))?.split('=')[1];
+  const showHelp = args.includes('--help') || args.includes('-h');
+  
+  if (showHelp) {
+    console.log('🚀 Exact Maker Deposit Test - Available Flags:');
+    console.log('================================================');
+    console.log('--order-only          : Only create and print order (no deposit)');
+    console.log('--save-to-file        : Save order to JSON file');
+    console.log('--filename=<name>     : Custom filename for saved order');
+    console.log('--help, -h            : Show this help message');
+    console.log('');
+    console.log('📝 Examples:');
+    console.log('  npx ts-node src/test-deposit-exact-maker.ts --order-only --save-to-file');
+    console.log('  npx ts-node src/test-deposit-exact-maker.ts --save-to-file --filename=my-order.json');
+    console.log('  npx ts-node src/test-deposit-exact-maker.ts --order-only');
+    console.log('  npx ts-node src/test-deposit-exact-maker.ts');
+    return;
+  }
   
   if (orderOnly) {
-    await test.runOrderCreationOnly();
+    const orderData = await test.createOrder();
+    test.printOrderAsJson(orderData);
+    
+    if (saveToFile) {
+      test.saveOrderToFile(orderData, filename);
+    }
+    
+    console.log('\n✅ Order creation test completed successfully!');
   } else {
-    await test.run();
+    // For the full test, we'll save the order after creation
+    const orderData = await test.createOrder();
+    console.log('✅ Step 1: Order created successfully');
+
+    // Print order in JSON format for comparison
+    test.printOrderAsJson(orderData);
+    
+    if (saveToFile) {
+      test.saveOrderToFile(orderData, filename);
+    }
+
+    // Step 3: Wait for one block (like working example)
+    // due to LOP check allowedTime > block.timestamp
+    console.log(
+      'Waiting for one block - before "resolver" starts to execute order'
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    // Step 4: Test deposit with taker wallet
+    await test.testDeposit(orderData);
+    console.log('✅ Step 4: Deposit completed successfully');
+
+    console.log('\n✅ Exact maker test completed successfully!');
   }
 }
 

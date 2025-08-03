@@ -12,7 +12,9 @@ import {
 import { 
   insertOrder, 
   queryOrders, 
-  updateOrderStatus 
+  updateOrderStatus,
+  deleteAllOrders,
+  deleteOrderByHash
 } from '../database/orderService';
 import { 
   validateOrderQuery 
@@ -295,6 +297,80 @@ router.patch('/:orderHash/status', async (req: Request, res: Response) => {
     }
     
     throw createError('Failed to update order status', 500);
+  }
+});
+
+// DELETE /api/orders - Delete all orders
+router.delete('/', async (_req: Request, res: Response) => {
+  try {
+    logger.info('Deleting all orders');
+    
+    const deletedCount = await deleteAllOrders();
+    
+    const response: ApiResponse<{ deletedCount: number }> = {
+      success: true,
+      data: {
+        deletedCount
+      }
+    };
+    
+    logger.info('All orders deleted successfully', { deletedCount });
+    return res.json(response);
+    
+  } catch (error) {
+    logger.error('Error deleting all orders:', error);
+    throw createError('Failed to delete all orders', 500);
+  }
+});
+
+// DELETE /api/orders/:orderHash - Delete specific order
+router.delete('/:orderHash', async (req: Request, res: Response) => {
+  try {
+    const { orderHash } = req.params;
+    
+    if (!orderHash) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.INVALID_ORDER,
+          message: 'Order hash is required',
+          details: {}
+        }
+      };
+      return res.status(400).json(response);
+    }
+    
+    logger.info('Deleting specific order', { orderHash });
+    
+    const deleted = await deleteOrderByHash(orderHash);
+    
+    if (!deleted) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: OrderErrorCode.ORDER_NOT_FOUND,
+          message: 'Order not found',
+          details: {
+            orderHash
+          }
+        }
+      };
+      return res.status(404).json(response);
+    }
+    
+    const response: ApiResponse<{ orderHash: string }> = {
+      success: true,
+      data: {
+        orderHash
+      }
+    };
+    
+    logger.info('Order deleted successfully', { orderHash });
+    return res.json(response);
+    
+  } catch (error) {
+    logger.error('Error deleting order:', error);
+    throw createError('Failed to delete order', 500);
   }
 });
 

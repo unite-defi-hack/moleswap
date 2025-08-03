@@ -296,4 +296,35 @@ export async function validateOrderForSecretSharing(orderHash: string): Promise<
       error: `Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
+}
+
+/**
+ * Delete all orders from the database
+ * @returns Number of orders deleted
+ */
+export async function deleteAllOrders(): Promise<number> {
+  try {
+    const result = await db('orders').del();
+    logger.info(`Deleted ${result} orders from database`);
+    return result;
+  } catch (error) {
+    logger.error('Error deleting all orders:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete a specific order by hash
+ * @param orderHash - The order hash to delete
+ * @returns True if order was deleted, false if not found
+ */
+export async function deleteOrderByHash(orderHash: string): Promise<boolean> {
+  try {
+    const result = await db('orders').where({ order_hash: orderHash }).del();
+    logger.info(`Deleted order ${orderHash}, rows affected: ${result}`);
+    return result > 0;
+  } catch (error) {
+    logger.error('Error deleting order:', error);
+    throw error;
+  }
 } 
