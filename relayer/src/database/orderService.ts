@@ -74,7 +74,19 @@ export async function queryOrders(filters: OrderQueryFilters): Promise<OrderQuer
   }
   
   if (filters.maker) {
-    query = query.where({ maker: filters.maker });
+    if (Array.isArray(filters.maker)) {
+      query = query.whereIn('maker', filters.maker);
+    } else {
+      query = query.where({ maker: filters.maker });
+    }
+  }
+  
+  if (filters.taker) {
+    if (Array.isArray(filters.taker)) {
+      query = query.whereIn('taker', filters.taker);
+    } else {
+      query = query.where({ taker: filters.taker });
+    }
   }
   
   if (filters.makerAsset) {

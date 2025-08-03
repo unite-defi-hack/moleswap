@@ -8,6 +8,7 @@ A cross-chain atomic swap relayer for the MoleSwap protocol, enabling secure and
 - **Plugin Architecture**: Extensible chain support through a plugin system
 - **Secure Secret Management**: Cryptographic secret generation and distribution
 - **Escrow Validation**: Automated validation of escrow contracts and balances
+- **Advanced Order Filtering**: Support for filtering orders by multiple maker and taker addresses across all supported chains
 - **RESTful API**: Clean and documented API endpoints
 - **SQLite Database**: Lightweight and reliable data storage
 - **Comprehensive Logging**: Winston-based logging with multiple transports
@@ -69,6 +70,32 @@ The server will start on `http://localhost:3000`
 - `POST /api/orders/data` - Generate order data with hashlock
 - `POST /api/orders` - Create order with signed data
 - `GET /api/orders` - Query orders with filters
+
+**Query Parameters for GET /api/orders:**
+- `status` - Filter by order status (pending, active, completed, cancelled)
+- `maker` - Filter by maker address (single address or multiple addresses)
+- `taker` - Filter by taker address (single address or multiple addresses)
+- `makerAsset` - Filter by maker token address
+- `takerAsset` - Filter by taker token address
+- `srcChainId` - Filter by source chain ID
+- `dstChainId` - Filter by destination chain ID
+- `limit` - Number of orders to return (default: 50, max: 100)
+- `offset` - Number of orders to skip (default: 0)
+
+**Advanced Filtering Examples:**
+```bash
+# Single maker address
+GET /api/orders?maker=0x1234567890123456789012345678901234567890
+
+# Multiple maker addresses
+GET /api/orders?maker=0x1234567890123456789012345678901234567890&maker=0x0987654321098765432109876543210987654321
+
+# Multiple taker addresses
+GET /api/orders?taker=0xabcdef1234567890abcdef1234567890abcdef12&taker=0xfedcba0987654321fedcba0987654321fedcba09
+
+# Combined filters
+GET /api/orders?maker=0x1234567890123456789012345678901234567890&taker=0xabcdef1234567890abcdef1234567890abcdef12&status=active&limit=20
+```
 
 ### Secrets
 - `POST /api/secrets/:orderHash` - Request secret for order

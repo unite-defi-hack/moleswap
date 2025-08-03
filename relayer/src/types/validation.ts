@@ -188,12 +188,24 @@ export const orderQueryFiltersSchema = Joi.object({
     .messages({
       'any.only': 'Status must be one of: pending, active, completed, cancelled'
     }),
-  maker: Joi.string()
-    .pattern(EVM_ADDRESS_REGEX)
-    .optional()
-    .messages({
-      'string.pattern.base': 'Maker must be a valid Ethereum address'
-    }),
+  maker: Joi.alternatives().try(
+    Joi.string().pattern(EVM_ADDRESS_REGEX),
+    Joi.array().items(Joi.string().pattern(EVM_ADDRESS_REGEX)).min(1)
+  ).optional()
+  .messages({
+    'string.pattern.base': 'Maker must be a valid Ethereum address',
+    'array.min': 'Maker addresses array must contain at least one address',
+    'alternatives.types': 'Maker must be a single address or array of addresses'
+  }),
+  taker: Joi.alternatives().try(
+    Joi.string().pattern(EVM_ADDRESS_REGEX),
+    Joi.array().items(Joi.string().pattern(EVM_ADDRESS_REGEX)).min(1)
+  ).optional()
+  .messages({
+    'string.pattern.base': 'Taker must be a valid Ethereum address',
+    'array.min': 'Taker addresses array must contain at least one address',
+    'alternatives.types': 'Taker must be a single address or array of addresses'
+  }),
   makerAsset: Joi.string()
     .pattern(EVM_ADDRESS_REGEX)
     .optional()

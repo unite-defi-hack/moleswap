@@ -426,6 +426,51 @@ describe('Orders API', () => {
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('INVALID_ORDER');
     });
+
+    it('should return orders with maker array filter', async () => {
+      const response = await request(app)
+        .get('/api/orders?maker=0x1234567890123456789012345678901234567890&maker=0x0987654321098765432109876543210987654321')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toHaveLength(1);
+    });
+
+    it('should return orders with taker array filter', async () => {
+      const response = await request(app)
+        .get('/api/orders?taker=0x1234567890123456789012345678901234567890&taker=0x0987654321098765432109876543210987654321')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toHaveLength(1);
+    });
+
+    it('should return orders with both maker and taker array filters', async () => {
+      const response = await request(app)
+        .get('/api/orders?maker=0x1234567890123456789012345678901234567890&maker=0x0987654321098765432109876543210987654321&taker=0xabcdef1234567890abcdef1234567890abcdef12&taker=0xfedcba0987654321fedcba0987654321fedcba09')
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.orders).toHaveLength(1);
+    });
+
+    it('should reject invalid maker address in array', async () => {
+      const response = await request(app)
+        .get('/api/orders?maker=0x1234567890123456789012345678901234567890&maker=invalid_address')
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('INVALID_ORDER');
+    });
+
+    it('should reject invalid taker address in array', async () => {
+      const response = await request(app)
+        .get('/api/orders?taker=0x1234567890123456789012345678901234567890&taker=invalid_address')
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('INVALID_ORDER');
+    });
   });
 
   describe('PATCH /api/orders/:orderHash/status', () => {

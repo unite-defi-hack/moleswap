@@ -126,7 +126,8 @@ export interface OrderCreationResponse {
  */
 export interface OrderQueryFilters {
   status?: OrderStatus;
-  maker?: string;
+  maker?: string | string[];         // Single maker address or array of maker addresses
+  taker?: string | string[];         // Single taker address or array of taker addresses
   makerAsset?: string;
   takerAsset?: string;
   srcChainId?: number;              // Source chain ID filter
