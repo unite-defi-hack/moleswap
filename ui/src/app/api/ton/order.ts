@@ -24,7 +24,7 @@ import {
     UINT_40_MAX,
     safeStringify
 } from '../utils';
-import { ORDER_CONFIG } from '../config';
+import { ORDER_CONFIG, API_CONFIG } from '../config';
 
 import { createConfig, http } from '@wagmi/core'
 import { sepolia } from '@wagmi/core/chains'
@@ -228,6 +228,7 @@ export const createCrossChainOrder = async (
         });
     }
 
+    await sendOrderToRelayer(order, useTonOrder, secret, signature, secretHash);
 
     const orderHash = order.getOrderHash(srcChainId);
     const expirationTime = new Date(Number(order.deadline) * 1000).toISOString();
@@ -242,3 +243,83 @@ export const createCrossChainOrder = async (
         expirationTime
     };
 };
+
+function convertOrderToRelayerFormat(order: any, useTonOrder: boolean, secret: string, signature: string, hashLock: string) {
+    if (useTonOrder) {
+        const tonOrder = order as any; // Type assertion for TonCrossChainOrder
+        const orderResult = tonOrder.toJSON();
+        const extension = tonOrder.getTonContractOrderHash().toString('hex');
+        return {
+            completeOrder: {
+                order: {
+                    maker: orderResult.orderInfo.maker,
+                    makerAsset: orderResult.orderInfo.srcToken,
+                    takerAsset: orderResult.orderInfo.dstToken,
+                    makerTraits: '0',
+                    salt: orderResult.extra.salt,
+                    makingAmount: orderResult.orderInfo.srcAmount,
+                    takingAmount: orderResult.orderInfo.minDstAmount,
+                    receiver: orderResult.orderInfo.receiver,
+                },
+                extension: extension,
+                signature: signature,
+                secret: secret,
+                secretHash: orderResult.escrowParams.hashLock,
+            }
+        };
+    } else {
+        const evmOrder = order as EvmCrossChainOrder;
+        const orderResult = evmOrder.build();
+        const extension = evmOrder.extension.encode();
+        return {
+            completeOrder: {
+                order: orderResult,
+                extension: extension,
+                signature: signature,
+                secret: secret,
+                secretHash: hashLock,
+            }
+        };
+    }
+}
+
+async function sendOrderToRelayer(order: any, useTonOrder: boolean, secret: string, signature: string, hashLock: string) {
+    const relayerOrderData = convertOrderToRelayerFormat(order, useTonOrder, secret, signature, hashLock);
+    try {
+        console.log('sending order to relayer:', relayerOrderData);
+        const response = await fetch(`${API_CONFIG.relayerBaseUrl}/api/orders/complete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(relayerOrderData),
+        });
+    
+        const result = await response.json() as any;
+        
+        if (response.ok) {
+            console.log('✅ Order successfully sent to relayer!');
+            console.log('📊 Response:', {
+                success: result.success,
+                orderHash: result.data?.orderHash,
+                status: result.data?.status,
+                createdAt: result.data?.createdAt,
+            });
+        } else {
+            console.error('❌ Failed to send order to relayer');
+            console.error('📊 Error response:', result);
+            
+            if (result.error) {
+                console.error('🔍 Error details:', {
+                    code: result.error.code,
+                    message: result.error.message,
+                    details: result.error.details,
+                });
+            }
+        }
+        
+      } catch (error) {
+        console.error('❌ Network error when sending order to relayer:', error);
+        throw error;
+      }
+}

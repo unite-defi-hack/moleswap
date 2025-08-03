@@ -28,9 +28,10 @@ export function OrdersTable() {
 
             const userAddresses: string[] = [];
 
-            if (tonConnectUI?.account?.address) {
-                userAddresses.push(tonConnectUI.account.address);
-            }
+            // TODO: should be uncommented when relayer supports ton addresses
+            // if (tonConnectUI?.account?.address) {
+            //     userAddresses.push(tonConnectUI.account.address);
+            // }
 
             if (ethAddress) {
                 userAddresses.push(ethAddress);
