@@ -7,7 +7,7 @@ import { Button } from './ui/Button';
 import { AVAILABLE_ASSETS, Asset } from '@/app/assets';
 import { createCrossChainOrder, CrossChainOrder } from '@/app/api/ton/order';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { Address } from 'ton-core';
+import { Address } from '@ton/core';
 
 import { useAccount, useSignTypedData } from 'wagmi';
 
