@@ -183,7 +183,8 @@ export const createCrossChainOrder = async (
             {
                 allowPartialFills: false,
                 allowMultipleFills: false,
-                nonce: nonce
+                nonce: nonce,
+                orderExpirationDelay: BigInt(60 * 60), // 1 hour in seconds
             }
         );
     }
