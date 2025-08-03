@@ -139,3 +139,7 @@ To modify the scripts:
 2. Test with `npx ts-node scripts/script-name.ts`
 3. Ensure the relayer is running before testing
 4. Check logs for detailed execution information 
+
+
+
+USE_DUMMY_PLUGIN=true DUMMY_CHAINS=1,137,56,608,11155111 npm start

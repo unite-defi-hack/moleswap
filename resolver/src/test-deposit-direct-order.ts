@@ -8,9 +8,13 @@ import {
   AmountMode,
   EvmAddress,
   Address,
+  TonAddress,
 } from "@1inch/cross-chain-sdk";
 import { loadConfig } from './config';
 import { Signature } from "ethers";
+
+// Import TonAdapter for destination escrow creation
+import { TonAdapter } from './services/lib/tonAdapter';
 
 interface RelayerOrder {
   order: {
@@ -280,8 +284,105 @@ class DirectOrderDepositTest {
         blockTimestamp: depositResult.blockTimestamp
       });
 
+      // Step 5: Create destination escrow on TON chain
+      console.log("🚀 Step 5: Creating destination escrow...");
+      const destinationResult = await this.createTonDestinationEscrow(storedOrder, depositResult);
+      
+      console.log("✅ Destination escrow creation completed!");
+      console.log("📊 Destination escrow result:", {
+        evmOrderHash: destinationResult.evmOrderHash,
+        tonOrderHash: destinationResult.tonOrderHash,
+        dstEscrowAddress: destinationResult.dstEscrowAddress,
+        srcEscrowAddress: destinationResult.srcEscrowAddress,
+        transactionHash: destinationResult.transactionHash,
+        success: destinationResult.success
+      });
+
     } catch (error) {
       console.error('❌ Deposit failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create destination escrow on TON chain
+   */
+  async createTonDestinationEscrow(
+    orderData: any,
+    depositResult: any
+  ): Promise<any> {
+    console.log('🚀 Creating destination escrow on TON chain...');
+    
+    try {
+      // Re-create the order object from stored data
+      const extension = Extension.decode(orderData.extension);
+      const evmOrder = EvmCrossChainOrder.fromDataAndExtension(
+        orderData.order,
+        extension
+      );
+
+      console.log('🔧 EVM Order recreated for TON destination escrow');
+      console.log('📋 Order details:', {
+        orderHash: orderData.orderHash,
+        receiver: evmOrder.receiver.toString(),
+        makingAmount: evmOrder.makingAmount.toString(),
+        takingAmount: evmOrder.takingAmount.toString()
+      });
+
+      // Create TON order configuration
+      const tonOrder = TonAdapter.createEvmToTonOrderConfig(
+        {
+          order: orderData.order,
+          extension: orderData.extension,
+          signature: orderData.signature,
+          secret: orderData.secret,
+          hashlock: orderData.secretHash,
+          orderHash: orderData.orderHash,
+          expirationTime: orderData.expirationTime
+        },
+        evmOrder.receiver.toString()
+      );
+
+      console.log('📋 TON Order configuration created:', {
+        orderHash: "0x" + (tonOrder as any).order_hash?.toString(16),
+        makerAddress: "0x" + (tonOrder as any).maker_address.toString(16),
+        receiver: evmOrder.receiver.toString()
+      });
+
+      // Create destination escrow on TON
+      const destinationResult = await TonAdapter.createDestinationEscrow(
+        this.config.crossChain.tonLopAddress,
+        tonOrder
+      );
+
+      console.log('✅ Destination escrow creation initiated:', {
+        transactionHash: destinationResult.transactionHash,
+        blockTime: destinationResult.blockTime,
+        orderHash: destinationResult.orderHash.toString()
+      });
+
+      // Get the deployed escrow address
+      const dstEscrowAddress = await TonAdapter.getDstEscrowAddressFromOrder(
+        orderData.orderHash
+      );
+
+      console.log('📋 Destination escrow address:', dstEscrowAddress);
+
+      return {
+        evmOrderHash: orderData.orderHash,
+        tonOrderHash: "0x" + (tonOrder as any).order_hash?.toString(16),
+        evmMaker: orderData.order.maker,
+        tonMaker: "0x" + (tonOrder as any).maker_address.toString(16),
+        transactionHash: destinationResult.transactionHash,
+        hashlock: orderData.secretHash,
+        secret: orderData.secret,
+        dstEscrowAddress,
+        srcEscrowAddress: depositResult.escrowAddress,
+        success: true // Destination escrow creation was successful
+      };
+
+    } catch (error) {
+      console.error('❌ Destination escrow creation failed:', error);
       throw error;
     }
   }

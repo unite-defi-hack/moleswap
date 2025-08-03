@@ -190,13 +190,13 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
       return res.status(500).json(response);
     }
 
-    // Verify the secret matches the order's hashlock (makerTraits)
+    // Verify the secret matches the order's secret_hash
     const order = orderValidation.order!;
     const expectedHash = ethers.keccak256(secret);
-    if (expectedHash !== order.hashlock) {
-      logger.error('Stored secret does not match order hashlock', {
+    if (expectedHash !== order.secret_hash) {
+      logger.error('Stored secret does not match order secret_hash', {
         orderHash,
-        orderHashlock: order.hashlock,
+        orderSecretHash: order.secret_hash,
         secretHash: expectedHash
       });
       

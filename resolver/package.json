@@ -10,6 +10,7 @@
     "test": "jest",
     "test:deposit-exact-maker": "ts-node src/test-deposit-exact-maker.ts",
     "test:deposit": "ts-node src/test-deposit.ts",
+    "test:deposit-direct-order": "ts-node src/test-deposit-direct-order.ts",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist"
   },
@@ -20,7 +21,11 @@
     "winston": "^3.11.0",
     "crypto": "^1.0.1",
     "@1inch/cross-chain-sdk": "file:../1inch-cross-chain-sdk",
-    "@1inch/limit-order-sdk": "^4.0.0"
+    "@1inch/limit-order-sdk": "^4.0.0",
+    "moleswap-ton": "file:../ton",
+    "@ton/core": "^0.61.0",
+    "@ton/ton": "^15.0.0",
+    "@ton/crypto": "^3.3.0"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",
