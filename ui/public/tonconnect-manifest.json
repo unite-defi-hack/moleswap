@@ -1,7 +1,7 @@
 {
-  "url": "https://ton-connect.github.io/demo-dapp-with-react-ui/",
+  "url": "https://moleswap.finance",
   "name": "Mole swap",
-  "iconUrl": "https://ton-connect.github.io/demo-dapp-with-react-ui/apple-touch-icon.png",
-  "termsOfUseUrl": "https://ton-connect.github.io/demo-dapp-with-react-ui/terms-of-use.txt",
-  "privacyPolicyUrl": "https://ton-connect.github.io/demo-dapp-with-react-ui/privacy-policy.txt"
+  "iconUrl": "https://raw.githubusercontent.com/unite-defi-hack/moleswap/refs/heads/main/ui/public/krtek_logo.png",
+  "termsOfUseUrl": "https://raw.githubusercontent.com/unite-defi-hack/moleswap/refs/heads/main/terms-of-use.txt",
+  "privacyPolicyUrl": "https://raw.githubusercontent.com/unite-defi-hack/moleswap/refs/heads/main/privacy-policy.txt"
 }

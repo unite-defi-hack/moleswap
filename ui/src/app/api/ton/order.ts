@@ -111,8 +111,8 @@ export const createCrossChainOrder = async (
     // ----------------------------------------------------------------------------
     // 4. Build Cross-Chain Order
     // ----------------------------------------------------------------------------
-    const MAKING_AMOUNT = BigInt(Math.floor(fromAmount * 1e9)); // Convert to nano
-    const TAKING_AMOUNT = BigInt(Math.floor(toAmount * 1e9)); // Convert to nano
+    const MAKING_AMOUNT = calculateAmount(fromAmount, fromAsset);
+    const TAKING_AMOUNT = calculateAmount(toAmount, toAsset);
 
     const nonce = randBigInt(UINT_40_MAX);
 
@@ -219,10 +219,11 @@ export const createCrossChainOrder = async (
         });
     }
 
-    await sendOrderToRelayer(order, useTonOrder, secret, signature, secretHash);
-
     const orderHash = order.getOrderHash(srcChainId);
     const expirationTime = new Date(Number(order.deadline) * 1000).toISOString();
+
+    const relayerOrderData = convertOrderToRelayerFormat(order, useTonOrder, secret, signature, secretHash, orderHash, expirationTime);
+    await sendOrderToRelayer(relayerOrderData);
 
     return {
         order: orderResult,
@@ -235,7 +236,7 @@ export const createCrossChainOrder = async (
     };
 };
 
-function convertOrderToRelayerFormat(order: any, useTonOrder: boolean, secret: string, signature: string, hashLock: string) {
+function convertOrderToRelayerFormat(order: any, useTonOrder: boolean, secret: string, signature: string, hashLock: string, orderHash: string, expirationTime: string) {
     if (useTonOrder) {
         const tonOrder = order as any; // Type assertion for TonCrossChainOrder
         const orderResult = tonOrder.toJSON();
@@ -252,10 +253,12 @@ function convertOrderToRelayerFormat(order: any, useTonOrder: boolean, secret: s
                     takingAmount: orderResult.orderInfo.minDstAmount,
                     receiver: orderResult.orderInfo.receiver,
                 },
-                extension: extension,
-                signature: signature,
-                secret: secret,
-                secretHash: orderResult.escrowParams.hashLock,
+                extension,
+                signature,
+                secret,
+                hashlock: orderResult.escrowParams.hashLock,
+                orderHash,
+                expirationTime,
             }
         };
     } else {
@@ -265,17 +268,18 @@ function convertOrderToRelayerFormat(order: any, useTonOrder: boolean, secret: s
         return {
             completeOrder: {
                 order: orderResult,
-                extension: extension,
-                signature: signature,
-                secret: secret,
-                secretHash: hashLock,
+                extension,
+                signature,
+                secret,
+                hashlock: hashLock,
+                orderHash,
+                expirationTime,
             }
         };
     }
 }
 
-async function sendOrderToRelayer(order: any, useTonOrder: boolean, secret: string, signature: string, hashLock: string) {
-    const relayerOrderData = convertOrderToRelayerFormat(order, useTonOrder, secret, signature, hashLock);
+async function sendOrderToRelayer(relayerOrderData: any) {
     try {
         console.log('sending order to relayer:', relayerOrderData);
         const response = await fetch(`${API_CONFIG.relayerBaseUrl}/api/orders/complete`, {
@@ -313,4 +317,8 @@ async function sendOrderToRelayer(order: any, useTonOrder: boolean, secret: stri
         console.error('❌ Network error when sending order to relayer:', error);
         throw error;
       }
+}
+
+function calculateAmount(amount: number, asset: Asset) {
+    return BigInt(Math.floor(amount * asset.decimals));
 }
