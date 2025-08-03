@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "",
   description: "",
+  icons: {
+    icon: "/krtek_logo.png",
+  },
 };
 
 export default function RootLayout({

@@ -67,5 +67,5 @@ function convertAsset(chainId: number, assetAddr: string, assetAmount: string) {
             return { network: a.networkName, symbol: a.symbol, amount: parseFloat(Number(amount).toFixed(4)).toString() };
         }
     }
-    return { network: chainId.toString(), symbol: '<Unknown>', amount: assetAmount };
+    return { network: (chainId | 0).toString(), symbol: '<Unknown>', amount: assetAmount };
 }
