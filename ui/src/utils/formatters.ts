@@ -1,16 +1,3 @@
-export function formatAmount(amount: bigint): string {
-    // Assuming 9 decimals for display
-    const divisor = BigInt(10 ** 9);
-    const wholePart = amount / divisor;
-    const decimalPart = amount % divisor;
-    
-    if (decimalPart === BigInt(0)) {
-        return wholePart.toString();
-    }
-    
-    const decimalStr = decimalPart.toString().padStart(9, '0').replace(/0+$/, '');
-    return `${wholePart}.${decimalStr}`;
-}
 
 export function formatTime(timestamp: number): string {
     return new Date(timestamp).toLocaleDateString('en-US', {

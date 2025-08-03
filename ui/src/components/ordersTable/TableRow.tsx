@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatAmount, formatTime, getAssetDisplayName, getStateColor } from '@/utils/formatters';
+import { formatTime, getAssetDisplayName, getStateColor } from '@/utils/formatters';
 import { Order } from '@/app/api/orders';
 
 interface TableRowProps {
@@ -7,20 +7,20 @@ interface TableRowProps {
 }
 
 export function TableRow({ order }: TableRowProps) {
-    const makingAmount = parseFloat(formatAmount(order.making_amount));
-    const takingAmount = parseFloat(formatAmount(order.taking_amount));
+    const makingAmount = parseFloat(order.making_amount);
+    const takingAmount = parseFloat(order.taking_amount);
     const rate = takingAmount > 0 ? (makingAmount / takingAmount).toFixed(4) : '0';
 
     return (
         <tr className="hover:bg-gray-50 border border-gray-200 rounded-lg">
             <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900 font-medium">
-                    {formatAmount(order.making_amount)} {getAssetDisplayName(order.maker_asset)}
+                    {order.making_amount} {getAssetDisplayName(order.maker_asset)}
                 </div>
             </td>
             <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900 font-medium">
-                    {formatAmount(order.taking_amount)} {getAssetDisplayName(order.taker_asset)}
+                    {order.taking_amount} {getAssetDisplayName(order.taker_asset)}
                 </div>
             </td>
             <td className="px-6 py-4 whitespace-nowrap">

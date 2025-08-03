@@ -1,4 +1,3 @@
-import { Address } from "@ton/core";
 import { API_CONFIG } from "./config";
 import { AVAILABLE_ASSETS } from "../assets";
 
@@ -8,18 +7,19 @@ export type Order = {
     expiration_time?: number;
     maker: string;
     maker_asset: string;
-    making_amount: bigint;
+    making_amount: string;
     receiver: string;
     taker_asset: string;
-    taking_amount: bigint;
+    taking_amount: string;
     src_chain: string;
     dst_chain: string;
     state: string;
 };
 
-export async function getOrders(): Promise<Order[]> {
+export async function getUserOrders(userAddresses: string[]): Promise<Order[]> {
     try {
-        const response = await fetch(`${API_CONFIG.relayerBaseUrl}/api/orders`, {
+        const makerParams = userAddresses.map(address => `maker=${address}`).join('&');
+        const response = await fetch(`${API_CONFIG.relayerBaseUrl}/api/orders?${makerParams}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
@@ -32,22 +32,22 @@ export async function getOrders(): Promise<Order[]> {
         }
 
         const res = await response.json();
-
-        console.log('data', res);
         
         let orders: Order[] = [];
 
         for (const order of res.data.orders) {
+            const srcAsset = convertAsset(order.order.srcChainId, order.order.makerAsset, order.order.makingAmount);
+            const dstAsset = convertAsset(order.order.dstChainId, order.order.takerAsset, order.order.takingAmount);
             orders.push({
                 order_hash: order.orderHash,
                 maker: order.order.maker,
-                maker_asset: convertAsset(order.order.makerAsset),
-                making_amount: BigInt(order.order.makingAmount),
-                taker_asset: convertAsset(order.order.takerAsset),
-                taking_amount: BigInt(order.order.takingAmount),
+                maker_asset: srcAsset.symbol,
+                making_amount: srcAsset.amount,
+                taker_asset: dstAsset.symbol,
+                taking_amount: dstAsset.amount,
                 state: order.status,
-                src_chain: convertChainId(order.order.srcChainId),
-                dst_chain: convertChainId(order.order.dstChainId),
+                src_chain: srcAsset.network,
+                dst_chain: dstAsset.network,
                 receiver: order.order.receiver,
                 creation_time: order.createdAt,
             });
@@ -60,21 +60,12 @@ export async function getOrders(): Promise<Order[]> {
     }
 }
 
-function convertChainId(chainId: number) {
-    if (chainId === 1) {
-        return 'Ton';
-    } else if (chainId === -239) {
-        return 'Ethereum';
-    } else {
-        return 'Unknown';
-    }
-}
-
-function convertAsset(asset: string) {
+function convertAsset(chainId: number, assetAddr: string, assetAmount: string) {
     for (const a of AVAILABLE_ASSETS) {
-        if (a.tokenAddress.toLowerCase() === asset.toLowerCase()) {
-            return a.symbol;
+        if (a.tokenAddress.toLowerCase() === assetAddr.toLowerCase()) {
+            const amount = BigInt(assetAmount) / a.decimals;
+            return { network: a.networkName, symbol: a.symbol, amount: parseFloat(Number(amount).toFixed(4)).toString() };
         }
     }
-    return '<Unknown Asset>';
+    return { network: chainId.toString(), symbol: '<Unknown>', amount: assetAmount };
 }
