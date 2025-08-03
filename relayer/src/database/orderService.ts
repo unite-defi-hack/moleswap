@@ -1,6 +1,7 @@
 import { db } from './connection';
 import { Order, OrderStatus, OrderWithMetadata, OrderWithMetadataResponse, OrderQueryFilters, OrderQueryResponse } from '../types/orders';
 import { logger } from '../utils/logger';
+import { extractChainInfo } from '../utils/extensionDecoder';
 
 export interface InsertOrderParams {
   order: Order;
@@ -22,6 +23,14 @@ export interface SecretRequestParams {
 
 export async function insertOrder(params: InsertOrderParams): Promise<OrderWithMetadata> {
   const now = new Date();
+  
+  // Extract chain information from extension if available
+  let chainInfo = null;
+  if (params.extension) {
+    chainInfo = extractChainInfo(params.extension);
+    logger.info('Extracted chain info from extension:', chainInfo);
+  }
+  
   await db('orders').insert({
     order_hash: params.orderHash,
     maker: params.order.maker,
@@ -31,10 +40,10 @@ export async function insertOrder(params: InsertOrderParams): Promise<OrderWithM
     maker_amount: params.order.makingAmount,
     taker_amount: params.order.takingAmount,
     receiver: params.order.receiver || '0x0000000000000000000000000000000000000000',
-    source_chain: params.order.srcChainId?.toString() || '',
-    destination_chain: params.order.dstChainId?.toString() || '',
-    source_escrow: params.order.srcEscrowAddress || '',
-    destination_escrow: params.order.dstEscrowAddress || '',
+    source_chain: chainInfo?.srcChainId?.toString() || params.order.srcChainId?.toString() || '',
+    destination_chain: chainInfo?.dstChainId?.toString() || params.order.dstChainId?.toString() || '',
+    source_escrow: chainInfo?.srcEscrowAddress || params.order.srcEscrowAddress || '',
+    destination_escrow: chainInfo?.dstEscrowAddress || params.order.dstEscrowAddress || '',
     hashlock: params.hashlock,
     secret: params.secret || null,
     secret_hash: params.secretHash || null,
