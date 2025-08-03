@@ -1,16 +1,6 @@
 import React from 'react';
 import { formatAmount, formatTime, getAssetDisplayName, getStateColor } from '@/utils/formatters';
-
-type Order = {
-    order_hash: bigint;
-    creation_time: number;
-    expiration_time: number;
-    maker_asset: string;
-    making_amount: bigint;
-    taker_asset: string;
-    taking_amount: bigint;
-    state: string;
-};
+import { Order } from '@/app/api/orders';
 
 interface TableRowProps {
     order: Order;
@@ -42,7 +32,7 @@ export function TableRow({ order }: TableRowProps) {
                 {formatTime(order.creation_time)}
             </td>
             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                {formatTime(order.expiration_time)}
+                {!!order.expiration_time ? formatTime(order.expiration_time): '-'}
             </td>
             <td className="px-6 py-4 whitespace-nowrap">
                 <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStateColor(order.state)}`}>

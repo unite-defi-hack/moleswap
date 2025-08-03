@@ -44,6 +44,11 @@ export const ORDER_CONFIG = {
     }
 };
 
+export const API_CONFIG = {
+    relayerBaseUrl: 'http://localhost:3001',
+    relayerTimeout: 10000, // 10 seconds
+};
+
 export function initOrderConfig() {
     return ORDER_CONFIG;
 } 

@@ -1,21 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getOrders } from '@/app/api/orders';
+import { getOrders, Order } from '@/app/api/orders';
 import { LoadingState } from '@/components/ui/LoadingState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { OrdersContainer } from '@/components/ordersTable/OrdersContainer';
-
-type Order = {
-    order_hash: bigint;
-    creation_time: number;
-    expiration_time: number;
-    maker_asset: string;
-    making_amount: bigint;
-    taker_asset: string;
-    taking_amount: bigint;
-    state: string;
-};
 
 export function OrdersTable() {
     const [orders, setOrders] = useState<Order[]>([]);

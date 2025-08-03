@@ -2,17 +2,7 @@ import React from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { TableHeader } from '@/components/ordersTable/TableHeader';
 import { TableRow } from '@/components/ordersTable/TableRow';
-
-type Order = {
-    order_hash: bigint;
-    creation_time: number;
-    expiration_time: number;
-    maker_asset: string;
-    making_amount: bigint;
-    taker_asset: string;
-    taking_amount: bigint;
-    state: string;
-};
+import { Order } from '@/app/api/orders';
 
 interface OrdersContainerProps {
     orders: Order[];
