@@ -95,7 +95,7 @@ export class TonAdapter {
       );
   }
 
-    const result = await TonAdapter.waitForTransaction(walletContract, seqno);
+    const result = await TonAdapter.waitForTransaction(walletContract, seqno, client);
     return result;
   }
 
@@ -155,14 +155,14 @@ export class TonAdapter {
     });
     const walletContract = client.open(wallet);
 
-    console.log("Wallet address:", walletContract.address.toString());
     return { client, walletContract, key };
   }
 
   static async waitForTransaction(
     walletContract: any,
     initialSeqno: number,
-    maxAttempts: number = 60
+    client?: TonClient,
+    maxAttempts: number = 60,
   ): Promise<WithdrawalResult> {
     let currentSeqno = initialSeqno;
     let attempts = 0;
@@ -182,6 +182,32 @@ export class TonAdapter {
       };
     }
 
+    // Try to get the actual transaction hash
+    if (client) {
+      try {
+        const transactions = await client.getTransactions(walletContract.address, {
+          limit: 5,
+          inclusive: true
+        });
+
+        // Find the transaction with our seqno
+        for (const tx of transactions) {
+          if (tx.outMessagesCount > 0) {
+            // Convert to hex format which is more URL-friendly
+            const txHash = tx.hash().toString('hex');
+            return {
+              success: true,
+              transactionHash: txHash,
+              seqno: currentSeqno,
+            };
+          }
+        }
+      } catch (error) {
+        console.log('Could not fetch transaction hash:', error);
+      }
+    }
+
+    // Fallback to seqno-based identifier
     return {
       success: true,
       transactionHash: `seqno-${initialSeqno}`,
@@ -208,7 +234,7 @@ export class TonAdapter {
       walletContract.sender(key.secretKey)
     );
 
-    return await TonAdapter.waitForTransaction(walletContract, seqno);
+    return await TonAdapter.waitForTransaction(walletContract, seqno, client);
   }
 
 
@@ -230,7 +256,7 @@ export class TonAdapter {
 
     await srcEscrowContract.sendWithdraw(walletContract.sender(key.secretKey), BigInt(orderData.secret));
 
-    return await TonAdapter.waitForTransaction(walletContract, seqno);
+    return await TonAdapter.waitForTransaction(walletContract, seqno, client);
   }
 
   static async withdrawFromDstEscrow(orderData: {
@@ -258,7 +284,7 @@ export class TonAdapter {
         secret
       );
 
-      return await TonAdapter.waitForTransaction(walletContract, seqno);
+      return await TonAdapter.waitForTransaction(walletContract, seqno, client);
     } catch (error) {
       return {
         success: false,
@@ -274,7 +300,7 @@ export class TonAdapter {
   ): Promise<TransactionResult> {
 
       const config = initMoleswapConfig();
-      const { walletContract, key, client } = await TonAdapter.setupTonWallet(config.tonMakerMnemonic);
+      const { walletContract, key, client } = await TonAdapter.setupTonWallet(config.tonTakerMnemonic);
 
       const contract = LimitOrderProtocol.createFromAddress(
         Address.parse(lopAddress)
@@ -307,7 +333,7 @@ export class TonAdapter {
         await jettonWallet.sendFillOrder(senderWithAddress, order, lopSC.address);
     }
 
-      const result = await TonAdapter.waitForTransaction(walletContract, seqno);
+      const result = await TonAdapter.waitForTransaction(walletContract, seqno, client);
 
 
       return result;

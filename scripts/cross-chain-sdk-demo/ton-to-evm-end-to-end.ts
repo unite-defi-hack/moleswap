@@ -14,6 +14,8 @@ import { initMoleswapConfig, MoleswapConfig } from "./lib/config";
 import { TonAdapter, OrderConfig } from "./lib/tonAdapter";
 import { JsonRpcProvider, parseEther, parseUnits, toBeHex, Wallet, zeroPadValue } from "ethers";
 import { EvmAdapter } from "./lib/evmAdapter";
+import { getTonBalance } from "./lib/utils";
+import { getEvmBalanceOfErc20 } from "./lib/utils";
 
 const UINT_40_MAX = (1n << 40n) - 1n;
 
@@ -102,77 +104,43 @@ async function createOrder(config: MoleswapConfig): Promise<{
 }
 
 async function main() {
+  console.log("Starting TON to EVM end-to-end workflow");
+  
   try {
     const config = initMoleswapConfig();
-    // const { order, secret } = await createOrder(config);
-
-    // console.log("order !!!!!!!!", order.toJSON());
-    // process.exit(0);
-
-    const orderOriginal = {
-      "order": {
-          "orderInfo": {
-              "srcToken": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
-              "dstToken": "0xa360725f46f43ad1b1aae09acfae96c2b59d1013",
-              "maker": "EQCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7Y-BU",
-              "srcAmount": "1000000000",
-              "minDstAmount": "1000000000",
-              "receiver": "0x71078879cd9a1d7987b74cee6b6c0d130f1a0115"
-          },
-          "escrowParams": {
-              "hashLock": "0xd8e5c652af9b83515aa5f5b59152d7436a5532ea6609110ecff93c24cb92a9e9",
-              "srcChainId": 608,
-              "dstChainId": 11155111,
-              "srcSafetyDeposit": "1000000000000",
-              "dstSafetyDeposit": "1000000000000",
-              "timeLocks": "5021681389186245593467173291389819933186039662988153480806400"
-          },
-          "details": {
-              "auction": {
-                  "startTime": "1754215276",
-                  "duration": "120",
-                  "initialRateBump": 0,
-                  "points": []
-              }
-          },
-          "extra": {
-              "srcAssetIsNative": true,
-              "orderExpirationDelay": "3600",
-              "source": "sdk",
-              "allowMultipleFills": false,
-              "allowPartialFills": false,
-              "salt": "2620121409"
-          }
-      },
-      "extension": "949dc439ed01c8000887bb2140ae9835a67eb8b7ac9742cedceedf0515ca1d3d",
-      "secret": "0xe88535269804e9a4f7a940d29d3121bee346f63ac97236a50ebefc9978559206",
-      "hashlock": "0xd8e5c652af9b83515aa5f5b59152d7436a5532ea6609110ecff93c24cb92a9e9",
-      "orderHash": "ae223545eab858c7db2205cb8cba01cff04c1f140a5c1fb2a0aff134ac44ff9e",
-      "expirationTime": "2025-08-03T11:03:16.000Z"
-  }
-
-    const order = TonCrossChainOrder.fromJSON(orderOriginal.order);
-    const secret = orderOriginal.secret;
+    const { order, secret } = await createOrder(config);
 
     const moleSwapOrder = await TonAdapter.createTonToEvmOrderConfig(
       order
     );
 
-    console.log("TON Create Order / SrcEscrow")
+    console.log("+ Order data - TON to EVM order", {
+      orderHash: moleSwapOrder.order_hash?.toString(),
+      makingAmount: moleSwapOrder.making_amount.toString() + " TON",
+      takingAmount: moleSwapOrder.taking_amount.toString() + " ERC20"
+    });
+
+    console.log("+ Checking balances");
+    const tonBalanceBefore = await getTonBalance("0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb");
+    const evmBalanceBefore = await getEvmBalanceOfErc20("0x71078879cd9A1D7987B74CEe6B6c0D130f1a0115", config.tokenA);
+    console.log(`+ Ton balance maker: ${tonBalanceBefore}`);
+    console.log(`+ Sepolia balance of ERC20 token: ${evmBalanceBefore}`);
+
+    console.log("+ Creating order / SrcEscrow in TON");
     const createOrderResult = await TonAdapter.sendCreateOrder(moleSwapOrder);
-    console.log("TON Create Order / SrcEscrow Result:", createOrderResult)
+    console.log(`+ Create order completed, transaction: https://testnet.tonviewer.com/transaction/${createOrderResult.transactionHash}`);
 
     const srcEscrowAddress = await TonAdapter.calculateSrcEscrowAddress(config.tonLopAddress, moleSwapOrder.order_hash!);
-    console.log("TON SrcEscrow address:", srcEscrowAddress);
-    console.log("->>> Client should share order & secret with relayer at this point")
-    console.log("....Let's wait for one block to mine....")
-    await new Promise((resolve) => setTimeout(resolve, 10000)); // mine one block
+    console.log(`+ TON SrcEscrow address: ${srcEscrowAddress}`);
+    console.log("->>> Client should share order & secret with relayer at this point");
+    console.log("- Waiting for one block to mine....");
+    await new Promise((resolve) => setTimeout(resolve, 10000));
 
-    console.log("TON Claim Order")
+    console.log("+ Claiming order in TON");
     const claimOrderResult = await TonAdapter.claimOrder(moleSwapOrder.order_hash!);
-    console.log("TON Claim Order Result:", claimOrderResult)
+    console.log(`+ Claim order completed, transaction: https://testnet.tonviewer.com/transaction/${claimOrderResult.transactionHash}`);
 
-    console.log("EVM Deploy DstEscrow")
+    console.log("+ Deploying DstEscrow in Sepolia");
     const provider = new JsonRpcProvider(config.rpcUrl);
     const taker = new Wallet(config.takerPrivateKey, provider);
     const evmAdapter = new EvmAdapter(provider, config);
@@ -181,24 +149,25 @@ async function main() {
         taker,
         moleSwapOrder
       );
-    console.log("EVM Deploy DstEscrow TX:", deployEscrowTxHash)
+    console.log(`+ Deploy DstEscrow completed, transaction: https://sepolia.etherscan.io/tx/${deployEscrowTxHash}`);
 
     const hashLockHex = zeroPadValue(toBeHex(moleSwapOrder.hashlock.toString()), 32);
     const { escrowAddress, blockTimestamp } = 
       await evmAdapter.getEscrowAddressFromEvent(blockHash, hashLockHex);
 
-    console.log("EVM DstEscrow address:", escrowAddress)
-    console.log("....Let's pretend that finalty of blocks where escrows were deployed occured....")
-    console.log("---> Relay should share the secret with resolvers at this point")
-    console.log("TON Withdraw from SrcEscrow")
+    console.log(`+ EVM DstEscrow address: ${escrowAddress}`);
+    console.log("- Waiting for finality on both sides....");
+    console.log("---> Relay should share the secret with resolvers at this point");
+    await new Promise((resolve) => setTimeout(resolve, 10000));
 
+    console.log("+ Withdrawing from SrcEscrow in TON");
     const withdrawFromSrcEscrowResult = await TonAdapter.withdrawFromSrcEscrow({
       orderHash: moleSwapOrder.order_hash!.toString(),
       secret: secret,
     });
-    console.log("TON Withdraw from SrcEscrow Result:", withdrawFromSrcEscrowResult)
+    console.log(`+ Withdrawal from source escrow completed, transaction: https://testnet.tonviewer.com/transaction/${withdrawFromSrcEscrowResult.transactionHash}`);
 
-    console.log("EVM Withdraw from DstEscrow")
+    console.log("+ Withdrawing from DstEscrow in Sepolia");
     const { transactionHash: withdrawTxHash } =
       await evmAdapter.withdrawFromDstEscrowWithOrder(
         escrowAddress,
@@ -207,7 +176,20 @@ async function main() {
         secret,
         BigInt(blockTimestamp.toString())
       );
-    console.log("EVM Withdraw from DstEscrow Result:", withdrawTxHash)
+    console.log(`+ Withdrawal from destination escrow completed, transaction: https://sepolia.etherscan.io/tx/${withdrawTxHash}`);
+
+    console.log("+ Withdrawals completed");
+
+    console.log("+ Checking balances");
+    const tonBalanceAfter = await getTonBalance("0QCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7YwYb");
+    const evmBalanceAfter = await getEvmBalanceOfErc20("0x71078879cd9A1D7987B74CEe6B6c0D130f1a0115", config.tokenA);
+    console.log(`+ Ton balance maker: ${tonBalanceAfter}`);
+    console.log(`+ Sepolia balance of ERC20 token: ${evmBalanceAfter}`);
+
+    console.log("\nSwapped stats:");
+    console.log(`+ Ton balance change: ${tonBalanceAfter - tonBalanceBefore} TON`);
+    console.log(`+ Sepolia balance of ERC20 token change: ${evmBalanceAfter - evmBalanceBefore} ERC20 token`);
+
   } catch (error) {
     console.error("Error creating TON → EVM order:", error);
     process.exit(1);
