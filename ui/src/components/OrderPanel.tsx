@@ -62,13 +62,21 @@ export const OrderPanel = () => {
             console.log('66666', tonConnectUI)
 
             // Step 5: Sign the order
+            const destinationAddress = payAsset.name == 'Ethereum' && tonConnectUI.account 
+                ? Address.parse(tonConnectUI.account.address).toString({testOnly: true}) 
+                : address;
+            
+            if (!destinationAddress) {
+                throw new Error('No destination address available');
+            }
+            
             const order = await createCrossChainOrder(
                 tonConnectUI,
                 payAsset,
                 parseFloat(payAmount),
                 receiveAsset,
                 parseFloat(receiveAmount),
-                payAsset.name == 'Ethereum' ? Address.parse(tonConnectUI.account.address).toString({testOnly: true}) : address,
+                destinationAddress,
                 signTypedDataAsync,
                 address
             );
