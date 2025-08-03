@@ -150,6 +150,7 @@ export const createCrossChainOrder = async (
                 allowPartialFills: false,
                 allowMultipleFills: false,
                 srcAssetIsNative: true,
+                orderExpirationDelay: BigInt(60 * 60), // 1 hour in seconds
             }
         );
     } else {
@@ -209,17 +210,7 @@ export const createCrossChainOrder = async (
         orderData = safeStringify(evmOrder.build());
         orderResult = evmOrder.build();
         extension = evmOrder.extension.encode();
-
-        const config = createConfig({
-            chains: [sepolia],
-            transports: {
-                [sepolia.id]: http(),
-            },
-        })
-
         const typedData = evmOrder.getTypedData(srcChainId);
-
-
         signature = await signTypedDataAsync({
             domain: typedData.domain,
             types: { Order: typedData.types.Order },
