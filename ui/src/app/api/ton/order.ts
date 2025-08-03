@@ -25,9 +25,11 @@ import {
     safeStringify
 } from '../utils';
 import { ORDER_CONFIG } from '../config';
-import { signTypedData } from '@wagmi/core'
+
 import { createConfig, http } from '@wagmi/core'
-import { mainnet, sepolia } from '@wagmi/core/chains'
+import { sepolia } from '@wagmi/core/chains'
+import { EvmCrossChainOrder } from '@1inch/cross-chain-sdk';
+
 
 
 
@@ -154,7 +156,6 @@ export const createCrossChainOrder = async (
         // ETH to TON order using EvmCrossChainOrder
         // Note: In a real implementation, this would require an EVM wallet connection
         // For now, we'll use a placeholder address
-        const { EvmCrossChainOrder } = await import('@1inch/cross-chain-sdk');
         order = EvmCrossChainOrder.new(
             EvmAddress.fromString(ORDER_CONFIG.escrowFactoryAddress),
             {
@@ -182,7 +183,8 @@ export const createCrossChainOrder = async (
             {
                 allowPartialFills: false,
                 allowMultipleFills: false,
-                nonce: nonce
+                nonce: nonce,
+                orderExpirationDelay: BigInt(60 * 60), // 1 hour in seconds
             }
         );
     }
@@ -203,7 +205,7 @@ export const createCrossChainOrder = async (
         extension = tonOrder.getTonContractOrderHash().toString('hex');
     } else {
         // Handle EvmCrossChainOrder
-        const evmOrder = order as any; // Type assertion for EvmCrossChainOrder
+        const evmOrder = order as EvmCrossChainOrder;
         orderData = safeStringify(evmOrder.build());
         orderResult = evmOrder.build();
         extension = evmOrder.extension.encode();
@@ -239,55 +241,4 @@ export const createCrossChainOrder = async (
         orderHash,
         expirationTime
     };
-};
-
-// Legacy function for backward compatibility
-export const createOrder = async (
-    tonConnect: TonConnectUI,
-    fromAsset: Asset,
-    fromAmount: number,
-    toAsset: Asset,
-    toAmount: number,
-    receiverAddress: string,
-) => {
-    const crossChainOrder = await createCrossChainOrder(
-        tonConnect,
-        fromAsset,
-        fromAmount,
-        toAsset,
-        toAmount,
-        receiverAddress
-    );
-
-    console.log('Created cross-chain order:', crossChainOrder);
-
-    // Send the order to the blockchain
-    await tonConnect.sendTransaction({
-        validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutes from now
-        messages: [
-            {
-                amount: (toNano(0.05) + toNano(fromAmount)).toString(),
-                address: ESCROW_FACTORY.toString(),
-                payload: beginCell()
-                    .storeUint(crc32('create_order'), 32)
-                    .storeUint(Date.now(), 64)
-                    .storeUint(1, 32) // orderId
-                    .storeCoins(toNano(fromAmount))
-                    .storeRef(
-                        beginCell()
-                            .storeUint(toAsset.network, 8)
-                            .storeUint(ethAddressToBigInt(toAsset.tokenAddress), 256)
-                            .storeUint(ethAddressToBigInt(receiverAddress), 256)
-                            .storeUint(toAmount, 128)
-                            .endCell(),
-                    )
-                    .storeUint(BigInt(crossChainOrder.hashlock), 256)
-                    .endCell()
-                    .toBoc()
-                    .toString('base64'),
-            },
-        ],
-    });
-
-    return crossChainOrder;
 };

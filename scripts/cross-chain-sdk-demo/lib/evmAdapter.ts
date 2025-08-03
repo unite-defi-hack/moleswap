@@ -342,11 +342,11 @@ export class EvmAdapter {
     taker: Wallet,
     fillAmount: bigint
   ): Promise<DepositResult> {
-    // Patch order hash method to ensure consistency with maker's signature
-    await this.patchOrderHash(order);
 
     // Build transaction for deploySrc
     const tx = this.buildDeploySrcTransaction(order, signature, fillAmount);
+
+    console.log("excuting source escrow");
 
     // Execute transaction
     const { txHash, blockTimestamp, blockHash } = await this.executeTransaction(
@@ -414,38 +414,6 @@ export class EvmAdapter {
       transactionHash: txHash,
       blockHash,
       blockTimestamp,
-    };
-  }
-
-  /**
-   * Patch order hash method to ensure consistency with maker's signature
-   * This is needed so that when SDK serializes back order object it calculates
-   * the correct hash that matches the maker's signature
-   */
-  private async patchOrderHash(order: EvmCrossChainOrder): Promise<void> {
-    const { buildOrderTypedData } = await import("@1inch/limit-order-sdk");
-
-    const typedData = buildOrderTypedData(
-      this.config.sourceChainId,
-      this.config.lopAddress,
-      "1inch Limit Order Protocol",
-      "4",
-      order.build()
-    );
-
-    const domainForSignature = {
-      ...typedData.domain,
-      chainId: this.config.sourceChainId,
-    };
-
-    // Patch the getOrderHash method to use the correct domain
-    (order as any).getOrderHash = (_srcChainId: number) => {
-      const { ethers } = require("ethers");
-      return ethers.TypedDataEncoder.hash(
-        domainForSignature,
-        { Order: typedData.types.Order },
-        typedData.message
-      );
     };
   }
 
