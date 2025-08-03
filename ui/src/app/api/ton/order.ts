@@ -25,9 +25,11 @@ import {
     safeStringify
 } from '../utils';
 import { ORDER_CONFIG } from '../config';
-import { signTypedData } from '@wagmi/core'
+
 import { createConfig, http } from '@wagmi/core'
-import { mainnet, sepolia } from '@wagmi/core/chains'
+import { sepolia } from '@wagmi/core/chains'
+import { EvmCrossChainOrder } from '@1inch/cross-chain-sdk';
+
 
 
 
@@ -154,7 +156,6 @@ export const createCrossChainOrder = async (
         // ETH to TON order using EvmCrossChainOrder
         // Note: In a real implementation, this would require an EVM wallet connection
         // For now, we'll use a placeholder address
-        const { EvmCrossChainOrder } = await import('@1inch/cross-chain-sdk');
         order = EvmCrossChainOrder.new(
             EvmAddress.fromString(ORDER_CONFIG.escrowFactoryAddress),
             {
@@ -203,7 +204,7 @@ export const createCrossChainOrder = async (
         extension = tonOrder.getTonContractOrderHash().toString('hex');
     } else {
         // Handle EvmCrossChainOrder
-        const evmOrder = order as any; // Type assertion for EvmCrossChainOrder
+        const evmOrder = order as EvmCrossChainOrder;
         orderData = safeStringify(evmOrder.build());
         orderResult = evmOrder.build();
         extension = evmOrder.extension.encode();
