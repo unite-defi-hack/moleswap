@@ -309,17 +309,6 @@ export class TonAdapter {
     }
   }
 
-  static async calculateOrderHash(order: OrderConfig): Promise<bigint> {
-    // make onchain call to calculate order hash
-    const config = initMoleswapConfig();
-    const { client } = await TonAdapter.setupTonWallet(config.tonTakerMnemonic);
-
-    const lop = LimitOrderProtocol.createFromAddress(Address.parse(config.tonLopAddress));
-    const lopContract = client.open(lop);
-    const orderHash = await lopContract.calculateOrderHash(order);
-    return orderHash;
-  }
-
   static createEvmToTonOrderConfig(
     evmOrderData: any,
     receiverAddress: string
@@ -365,7 +354,7 @@ export class TonAdapter {
       dstSafetyDeposit: order.dstSafetyDeposit,
     }
 
-    const orderHash = await TonAdapter.calculateOrderHash(orderConfig);
+    const orderHash = LimitOrderProtocol.calculateSrcOrderHash(orderConfig);
 
     return {
       ...orderConfig,
