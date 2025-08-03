@@ -6,7 +6,7 @@ export interface Asset {
     networkName: string;
     tokenAddress: string;
     icon: string;
-    decimals: bigint;
+    decimals: number;
 }
 
 export const AVAILABLE_ASSETS: Asset[] = [
@@ -16,9 +16,11 @@ export const AVAILABLE_ASSETS: Asset[] = [
         coinGeckoId: 'the-open-network',
         network: 608, // TON_TESTNET
         networkName: 'Ton',
-        tokenAddress: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
+        // should be commented address for ton
+        // tokenAddress: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
+        tokenAddress: '0xec0396430645c294ff99b8d71c93f74bc94119fa',
         icon: '/assets/ton.svg',
-        decimals: BigInt(10**9),
+        decimals: 10**9,
     },
     {
         symbol: 'ETH',
@@ -26,8 +28,8 @@ export const AVAILABLE_ASSETS: Asset[] = [
         coinGeckoId: 'ethereum',
         network: 11155111, // Sepolia (Ethereum testnet)
         networkName: 'Ethereum',
-        tokenAddress: '0xa360725F46f43aD1B1aae09AcFae96c2b59D1013',
+        tokenAddress: '0xa360725f46f43ad1b1aae09acfae96c2b59d1013',
         icon: '/assets/ethereum.svg',
-        decimals: BigInt(10**18),
+        decimals: 10**18,
     },
 ];

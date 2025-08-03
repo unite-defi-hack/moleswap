@@ -18,7 +18,7 @@ export type Order = {
 
 export async function getUserOrders(userAddresses: string[]): Promise<Order[]> {
     try {
-        const makerParams = userAddresses.map(address => `maker=${address}`).join('&');
+        const makerParams = userAddresses.map(address => `maker=${address.toLowerCase()}`).join('&');
         const response = await fetch(`${API_CONFIG.relayerBaseUrl}/api/orders?${makerParams}`, {
             method: 'GET',
             headers: {
@@ -63,8 +63,8 @@ export async function getUserOrders(userAddresses: string[]): Promise<Order[]> {
 function convertAsset(chainId: number, assetAddr: string, assetAmount: string) {
     for (const a of AVAILABLE_ASSETS) {
         if (a.tokenAddress.toLowerCase() === assetAddr.toLowerCase()) {
-            const amount = BigInt(assetAmount) / a.decimals;
-            return { network: a.networkName, symbol: a.symbol, amount: parseFloat(Number(amount).toFixed(4)).toString() };
+            const amount = Number(assetAmount) / a.decimals;
+            return { network: a.networkName, symbol: a.symbol, amount: parseFloat(amount.toFixed(8)).toString() };
         }
     }
     return { network: (chainId | 0).toString(), symbol: '<Unknown>', amount: assetAmount };
