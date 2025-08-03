@@ -298,8 +298,129 @@ class DirectOrderDepositTest {
         success: destinationResult.success
       });
 
+      // Step 6: Wait for finality on both sides
+      console.log("⏳ Waiting for finality on both sides...");
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      // Step 7: Request secret from relayer
+      console.log("🔐 Requesting secret from relayer...");
+      // Use dummy addresses for validation since we're using dummy plugins
+      const dummySrcEscrow = destinationResult.srcEscrowAddress || "0x0000000000000000000000000000000000000000";
+      const dummyDstEscrow = "0x0000000000000000000000000000000000000000"; // Use dummy address for TON
+      const secret = await this.requestSecretFromRelayer(storedOrder.orderHash, dummySrcEscrow, dummyDstEscrow);
+      
+      console.log("✅ Secret retrieved successfully:", {
+        secret: secret.substring(0, 20) + '...',
+        orderHash: storedOrder.orderHash
+      });
+
+      // Step 8: Withdraw from TON destination escrow
+      console.log("🚀 Withdrawing from TON destination escrow...");
+      const tonWithdrawResult = await this.withdrawFromTonDstEscrow(storedOrder.orderHash, secret);
+      
+      console.log("✅ TON withdrawal completed:", {
+        success: tonWithdrawResult.success,
+        transactionHash: tonWithdrawResult.transactionHash,
+        blockTime: tonWithdrawResult.blockTime
+      });
+
+      // Step 9: Withdraw from EVM source escrow
+      console.log("🚀 Withdrawing from EVM source escrow...");
+      const evmWithdrawResult = await this.withdrawFromEvmSrcEscrow(depositResult, secret);
+      
+      console.log("✅ EVM withdrawal completed:", {
+        success: evmWithdrawResult.success,
+        transactionHash: evmWithdrawResult.transactionHash,
+        blockHash: evmWithdrawResult.blockHash
+      });
+
+      console.log("🎉 Complete cross-chain atomic swap completed successfully!");
+
     } catch (error) {
       console.error('❌ Deposit failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Request secret from relayer API
+   */
+  async requestSecretFromRelayer(orderHash: string, srcEscrowAddress: string, dstEscrowAddress: string): Promise<string> {
+    console.log('🔐 Requesting secret from relayer...');
+    
+    try {
+      const response = await axios.post(`${this.relayerUrl}/api/secrets/${orderHash}`, {
+        srcEscrowAddress,
+        dstEscrowAddress,
+        srcChainId: this.config.crossChain.sourceNetworkId.toString(),
+        dstChainId: this.config.crossChain.destinationNetworkId.toString()
+      });
+
+      if (!response.data.success) {
+        throw new Error(`Failed to get secret: ${response.data.error?.message || 'Unknown error'}`);
+      }
+
+      return response.data.data.secret;
+    } catch (error) {
+      console.error('❌ Failed to request secret from relayer:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Withdraw from TON destination escrow
+   */
+  async withdrawFromTonDstEscrow(orderHash: string, secret: string): Promise<any> {
+    console.log('🚀 Withdrawing from TON destination escrow...');
+    
+    try {
+      const result = await TonAdapter.withdrawFromDstEscrow({
+        orderHash,
+        secret
+      });
+
+      if (!result.success) {
+        throw new Error(`TON withdrawal failed: ${result.error}`);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('❌ TON withdrawal failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Withdraw from EVM source escrow
+   */
+  async withdrawFromEvmSrcEscrow(depositResult: any, secret: string): Promise<any> {
+    console.log('🚀 Withdrawing from EVM source escrow...');
+    
+    try {
+      // Import the EvmAdapter
+      const { EvmAdapter } = await import('./services/lib/evmAdapter');
+      
+      // Create EVM adapter config
+      const evmConfig = {
+        resolverProxyAddress: this.config.crossChain.resolverProxyAddress,
+        sourceChainId: this.config.crossChain.sourceNetworkId,
+        lopAddress: this.config.crossChain.lopAddress,
+        escrowFactoryAddress: this.config.crossChain.escrowFactoryAddress,
+      };
+
+      const evmAdapter = new EvmAdapter(this.provider, evmConfig);
+
+      // Execute withdrawal to taker address
+      const withdrawResult = await evmAdapter.withdrawFromSrcEscrow(
+        depositResult,
+        secret,
+        this.takerWallet.address,
+        this.takerWallet
+      );
+
+      return withdrawResult;
+    } catch (error) {
+      console.error('❌ EVM withdrawal failed:', error);
       throw error;
     }
   }

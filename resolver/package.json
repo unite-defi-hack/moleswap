@@ -11,6 +11,7 @@
     "test:deposit-exact-maker": "ts-node src/test-deposit-exact-maker.ts",
     "test:deposit": "ts-node src/test-deposit.ts",
     "test:deposit-direct-order": "ts-node src/test-deposit-direct-order.ts",
+    "test:execution-service": "ts-node src/test-execution-service.ts",
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist"
   },

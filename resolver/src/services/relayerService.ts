@@ -75,6 +75,30 @@ export class RelayerService {
   }
 
   /**
+   * Get processable orders (active and pending, excluding completed and cancelled)
+   */
+  async getProcessableOrders(limit: number = 50, offset: number = 0): Promise<OrderWithMetadata[]> {
+    // Get both active and pending orders
+    const activeOrders = await this.getOrders(limit, offset, 'active');
+    const pendingOrders = await this.getOrders(limit, offset, 'pending');
+    
+    // Combine and deduplicate orders (in case there are overlapping orders)
+    const allOrders = [...activeOrders, ...pendingOrders];
+    const uniqueOrders = allOrders.filter((order, index, self) => 
+      index === self.findIndex(o => o.orderHash === order.orderHash)
+    );
+    
+    // Sort by creation date (newest first) and limit
+    return uniqueOrders
+      .sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      })
+      .slice(0, limit);
+  }
+
+  /**
    * Get orders for specific chain pair
    */
   async getOrdersByChainPair(

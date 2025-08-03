@@ -87,6 +87,10 @@ export interface ExecutionResult {
   profit?: number;
   gasUsed?: number;
   executionTime: number;
+  additionalTransactions?: {
+    tonWithdraw?: string;
+    evmWithdraw?: string;
+  };
 }
 
 export interface EscrowValidationRequest {

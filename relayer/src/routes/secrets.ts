@@ -5,11 +5,13 @@ import { createError } from '../middleware/errorHandler';
 import { 
   ApiResponse, 
   SecretRequestResponse, 
-  OrderErrorCode 
+  OrderErrorCode,
+  OrderStatus
 } from '../types/orders';
 import { 
   validateOrderForSecretSharing, 
-  getOrderSecret 
+  getOrderSecret,
+  updateOrderStatus
 } from '../database/orderService';
 
 import { EscrowValidationService } from '../services/escrowValidationService';
@@ -209,6 +211,18 @@ router.post('/:orderHash', async (req: Request, res: Response) => {
         }
       };
       return res.status(500).json(response);
+    }
+    
+    // Update order status to COMPLETED since secret was successfully retrieved
+    try {
+      await updateOrderStatus(orderHash, OrderStatus.COMPLETED, 'Secret successfully retrieved');
+      logger.info('Order status updated to COMPLETED', { orderHash });
+    } catch (error) {
+      logger.error('Failed to update order status to COMPLETED', { 
+        orderHash, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      // Don't fail the request if status update fails, just log it
     }
     
     // Return the secret to the requester

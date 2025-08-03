@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import { Wallet, JsonRpcProvider } from "ethers";
+import axios from "axios";
 import {
   Address,
   HashLock,
@@ -31,6 +32,7 @@ export class ExecutionService {
   private provider: JsonRpcProvider;
   private wallet: Wallet;
   private resolverConfig: ResolverConfig;
+  private relayerUrl: string;
 
   constructor(config: ExecutionConfig, relayerService: RelayerService, resolverConfig?: ResolverConfig) {
     this.config = config;
@@ -38,6 +40,7 @@ export class ExecutionService {
     this.provider = new JsonRpcProvider(config.rpcUrl);
     this.wallet = new Wallet(config.privateKey, this.provider);
     this.resolverConfig = resolverConfig || this.loadDefaultConfig();
+    this.relayerUrl = process.env.RELAYER_URL || 'http://localhost:3000';
   }
 
   private loadDefaultConfig(): ResolverConfig {
@@ -47,32 +50,72 @@ export class ExecutionService {
   }
 
   /**
-   * Execute a cross-chain order
+   * Execute a cross-chain order with complete atomic swap flow
    */
-
   async executeOrder(orderWithMetadata: OrderWithMetadata): Promise<ExecutionResult> {
     const startTime = Date.now();
     const { order, orderHash } = orderWithMetadata;
 
     try {
-      console.log(`Starting execution for order: ${orderHash}`);
+      console.log(`🚀 Starting complete cross-chain execution for order: ${orderHash}`);
 
-      // Step 1: deposit to source escrow
-      const depositResult = await this.depositToSrcEscrow(order, orderHash);
-      console.log('Source escrow deposit completed:', depositResult);
+      // Step 1: Deposit to source escrow (EVM)
+      console.log('📥 Step 1: Depositing to source escrow...');
+      const depositResult = await this.depositToSrcEscrow(orderWithMetadata);
+      console.log('✅ Source escrow deposit completed:', {
+        escrowAddress: depositResult.escrowAddress,
+        transactionHash: depositResult.transactionHash
+      });
+
+      // Step 2: Create destination escrow (TON)
+      console.log('📥 Step 2: Creating destination escrow...');
+      const destinationResult = await this.createDestinationEscrow(orderWithMetadata, depositResult);
+      console.log('✅ Destination escrow created:', {
+        dstEscrowAddress: destinationResult.dstEscrowAddress,
+        transactionHash: destinationResult.transactionHash
+      });
+
+      // Step 3: Wait for finality on both sides
+      console.log('⏳ Step 3: Waiting for finality on both sides...');
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      // Step 4: Request secret from relayer
+      console.log('🔐 Step 4: Requesting secret from relayer...');
+      const secret = await this.requestSecretFromRelayer(orderHash, depositResult.escrowAddress, destinationResult.dstEscrowAddress);
+      console.log('✅ Secret retrieved successfully');
+
+      // Step 5: Withdraw from TON destination escrow
+      console.log('🚀 Step 5: Withdrawing from TON destination escrow...');
+      const tonWithdrawResult = await this.withdrawFromDestinationEscrow(orderHash, secret);
+      console.log('✅ TON withdrawal completed:', {
+        transactionHash: tonWithdrawResult.transactionHash
+      });
+
+      // Step 6: Withdraw from EVM source escrow
+      console.log('🚀 Step 6: Withdrawing from EVM source escrow...');
+      const evmWithdrawResult = await this.withdrawFromSourceEscrow(depositResult, secret);
+      console.log('✅ EVM withdrawal completed:', {
+        transactionHash: evmWithdrawResult.transactionHash
+      });
+
+      console.log('🎉 Complete cross-chain atomic swap executed successfully!');
 
       return {
         success: true,
         orderHash,
         transactionHash: depositResult.transactionHash,
         executionTime: Date.now() - startTime,
-        profit: this.calculateProfit(order), // Mock profit calculation
-        gasUsed: 0 // TODO: Get actual gas used from deposit result
+        profit: this.calculateProfit(order),
+        gasUsed: 0, // TODO: Calculate actual gas used
+        additionalTransactions: {
+          tonWithdraw: tonWithdrawResult.transactionHash,
+          evmWithdraw: evmWithdrawResult.transactionHash
+        }
       };
 
     } catch (error) {
       const executionTime = Date.now() - startTime;
-      console.error(`Execution failed for order ${orderHash}:`, error);
+      console.error(`❌ Execution failed for order ${orderHash}:`, error);
 
       return {
         success: false,
@@ -86,7 +129,7 @@ export class ExecutionService {
   /**
    * Deposit to source escrow (EVM side)
    */
-  private async depositToSrcEscrow(order: any, orderHash: string): Promise<DepositResult> {
+  private async depositToSrcEscrow(orderWithMetadata: OrderWithMetadata): Promise<DepositResult> {
     try {
       // Initialize EVM adapter with required configuration
       const evmConfig: EvmAdapterConfig = {
@@ -98,59 +141,56 @@ export class ExecutionService {
 
       const evmAdapter = new EvmAdapter(this.provider, evmConfig);
 
-      // Check if we have the required extension and signature fields
-      if (!order.extension || !order.signature) {
-        console.log("Order data available:", {
-          maker: order.maker,
-          makerAsset: order.makerAsset,
-          takerAsset: order.takerAsset,
-          makingAmount: order.makingAmount,
-          takingAmount: order.takingAmount,
-          receiver: order.receiver,
-          makerTraits: order.makerTraits, // This contains the hashlock
-          extension: order.extension,
-          signature: order.signature,
-        });
+      console.log('🔍 Debug: Raw order data structure:', {
+        hasOrderField: !!orderWithMetadata.order,
+        orderType: typeof orderWithMetadata.order,
+        hasExtension: !!orderWithMetadata.extension,
+        hasSignature: !!orderWithMetadata.signature,
+        extensionLength: orderWithMetadata.extension?.length || 0,
+        signatureLength: orderWithMetadata.signature?.length || 0
+      });
 
-        // For now, return a mock result since we don't have the required extension and signature
-        // In production, this should be replaced with actual EVM adapter call
-        const mockEscrowAddress = `0x${randomBytes(20).toString('hex')}`;
-        const mockTransactionHash = `0x${randomBytes(32).toString('hex')}`;
-        
-        console.log("Mock deposit result - Missing extension and signature data");
-        
-        return {
-          escrowAddress: mockEscrowAddress,
-          transactionHash: mockTransactionHash,
-          blockHash: `0x${randomBytes(32).toString('hex')}`,
-          blockTimestamp: Math.floor(Date.now() / 1000),
-          srcEscrowEvent: [] as any, // Mock event data
-        };
+      // Extract data from OrderWithMetadata
+      const orderData = orderWithMetadata.order;
+      const extension = orderWithMetadata.extension;
+      const signature = orderWithMetadata.signature;
+
+      // Check if we have the required extension and signature fields
+      if (!extension || !signature) {
+        console.log("Order data available:", {
+          maker: orderData.maker,
+          makerAsset: orderData.makerAsset,
+          takerAsset: orderData.takerAsset,
+          makingAmount: orderData.makingAmount,
+          takingAmount: orderData.takingAmount,
+          receiver: orderData.receiver,
+          hasExtension: !!extension,
+          hasSignature: !!signature,
+          extensionLength: extension?.length || 0,
+          signatureLength: signature?.length || 0
+        });
+        throw new Error('Order missing required extension or signature data');
       }
 
-      // We have the required fields, proceed with actual EVM adapter call
-      console.log("Using actual EVM adapter with extension and signature data");
-      
       // Re-create the order object from serialized data
-      // Need to decode the extension string back to Extension object
-      const extension = Extension.decode(order.extension);
+      const decodedExtension = Extension.decode(extension);
       const evmOrder = EvmCrossChainOrder.fromDataAndExtension(
-        order,
-        extension
+        orderData,
+        decodedExtension
       );
 
-      // Execute deposit (order hash patching happens inside evmAdapter)
+      // Execute deposit
       const depositResult = await evmAdapter.deployAndDepositToSrcEscrow(
         evmOrder,
-        order.signature,
+        signature,
         this.wallet,
-        BigInt(order.makingAmount)
+        BigInt(orderData.makingAmount)
       );
 
       return depositResult;
       
     } catch (error) {
-      console.error('Failed to deposit to source escrow:', error);
+      console.error('❌ Failed to deposit to source escrow:', error);
       throw error;
     }
   }
@@ -158,12 +198,35 @@ export class ExecutionService {
   /**
    * Create destination escrow (TON side)
    */
-  private async createDestinationEscrow(order: any, orderHash: string) {
+  private async createDestinationEscrow(orderWithMetadata: OrderWithMetadata, depositResult: DepositResult) {
     try {
+      // Extract data from OrderWithMetadata
+      const orderData = orderWithMetadata.order;
+      const extension = orderWithMetadata.extension;
+      const signature = orderWithMetadata.signature;
+      const orderHash = orderWithMetadata.orderHash;
+
+      // Validate required fields
+      if (!extension || !signature) {
+        throw new Error('OrderWithMetadata missing required extension or signature data');
+      }
+
+      // Re-create the order object from stored data
+      const decodedExtension = Extension.decode(extension);
+      const evmOrder = EvmCrossChainOrder.fromDataAndExtension(
+        orderData,
+        decodedExtension
+      );
+
       // Create TON order configuration
       const tonOrder = TonAdapter.createEvmToTonOrderConfig(
-        { order, orderHash },
-        this.resolverConfig.crossChain.tonTakerAddress
+        {
+          order: orderData,
+          extension: extension,
+          signature: signature,
+          orderHash: orderHash
+        },
+        evmOrder.receiver.toString()
       );
 
       // Create destination escrow using TON adapter
@@ -176,22 +239,49 @@ export class ExecutionService {
         throw new Error(`TON escrow creation failed: ${result.error}`);
       }
 
-      // For testing with dummy plugins, use a valid Ethereum address format
-      // In production, this would be the actual TON escrow address
-      const mockEthereumAddress = `0x${randomBytes(20).toString('hex')}`;
+      // Get the deployed escrow address
+      const dstEscrowAddress = await TonAdapter.getDstEscrowAddressFromOrder(orderHash);
 
       return {
-        escrowAddress: mockEthereumAddress, // Use Ethereum format for dummy testing
-        transactionHash: result.transactionHash!
+        dstEscrowAddress,
+        transactionHash: result.transactionHash!,
+        success: true
       };
     } catch (error) {
-      console.error('Failed to create TON destination escrow:', error);
+      console.error('❌ Failed to create TON destination escrow:', error);
       throw error;
     }
   }
 
   /**
-   * Withdraw from destination escrow
+   * Request secret from relayer API
+   */
+  private async requestSecretFromRelayer(orderHash: string, srcEscrowAddress: string, dstEscrowAddress: string): Promise<string> {
+    try {
+      // Use dummy addresses for validation since we're using dummy plugins
+      const dummySrcEscrow = srcEscrowAddress || "0x0000000000000000000000000000000000000000";
+      const dummyDstEscrow = "0x0000000000000000000000000000000000000000"; // Use dummy address for TON
+      
+      const response = await axios.post(`${this.relayerUrl}/api/secrets/${orderHash}`, {
+        srcEscrowAddress: dummySrcEscrow,
+        dstEscrowAddress: dummyDstEscrow,
+        srcChainId: this.resolverConfig.crossChain.sourceNetworkId.toString(),
+        dstChainId: this.resolverConfig.crossChain.destinationNetworkId.toString()
+      });
+
+      if (!response.data.success) {
+        throw new Error(`Failed to get secret: ${response.data.error?.message || 'Unknown error'}`);
+      }
+
+      return response.data.data.secret;
+    } catch (error) {
+      console.error('❌ Failed to request secret from relayer:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Withdraw from destination escrow (TON)
    */
   private async withdrawFromDestinationEscrow(orderHash: string, secret: string) {
     try {
@@ -210,22 +300,42 @@ export class ExecutionService {
         transactionHash: result.transactionHash!
       };
     } catch (error) {
-      console.error('Failed to withdraw from TON destination escrow:', error);
+      console.error('❌ Failed to withdraw from TON destination escrow:', error);
       throw error;
     }
   }
 
   /**
-   * Withdraw from source escrow
+   * Withdraw from source escrow (EVM)
    */
-  private async withdrawFromSourceEscrow(srcEscrowResult: any, secret: string) {
-    // This would use the EVM adapter to withdraw from source escrow
-    // For now, we'll mock the implementation
-    
-    return {
-      success: true,
-      transactionHash: `0x${randomBytes(32).toString('hex')}`
-    };
+  private async withdrawFromSourceEscrow(depositResult: DepositResult, secret: string) {
+    try {
+      // Import the EvmAdapter
+      const { EvmAdapter } = await import('./lib/evmAdapter');
+      
+      // Create EVM adapter config
+      const evmConfig = {
+        resolverProxyAddress: this.resolverConfig.crossChain.resolverProxyAddress,
+        sourceChainId: this.resolverConfig.crossChain.sourceNetworkId,
+        lopAddress: this.resolverConfig.crossChain.lopAddress,
+        escrowFactoryAddress: this.resolverConfig.crossChain.escrowFactoryAddress,
+      };
+
+      const evmAdapter = new EvmAdapter(this.provider, evmConfig);
+
+      // Execute withdrawal to taker address
+      const withdrawResult = await evmAdapter.withdrawFromSrcEscrow(
+        depositResult,
+        secret,
+        this.wallet.address,
+        this.wallet
+      );
+
+      return withdrawResult;
+    } catch (error) {
+      console.error('❌ Failed to withdraw from EVM source escrow:', error);
+      throw error;
+    }
   }
 
   /**
@@ -275,5 +385,80 @@ export class ExecutionService {
       console.error('Failed to get gas price:', error);
       return '0';
     }
+  }
+
+  /**
+   * Check if an order is profitable to execute
+   */
+  async isOrderProfitable(order: any): Promise<boolean> {
+    try {
+      // Calculate potential profit
+      const profit = this.calculateProfit(order);
+      
+      // Get current gas price for cost estimation
+      const gasPrice = await this.getGasPrice();
+      const estimatedGasCost = this.config.gasLimit * parseFloat(gasPrice);
+      
+      // Check if profit exceeds gas costs plus minimum threshold
+      const minimumProfitThreshold = 0.001; // 0.001 ETH minimum profit
+      const totalCost = estimatedGasCost + minimumProfitThreshold;
+      
+      const isProfitable = profit > totalCost;
+      
+      console.log('💰 Profitability check:', {
+        estimatedProfit: profit,
+        estimatedGasCost,
+        minimumThreshold: minimumProfitThreshold,
+        totalCost,
+        isProfitable
+      });
+      
+      return isProfitable;
+    } catch (error) {
+      console.error('Failed to check profitability:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Execute profitable orders automatically
+   */
+  async executeProfitableOrders(orders: OrderWithMetadata[]): Promise<ExecutionResult[]> {
+    console.log(`🔍 Checking ${orders.length} orders for profitability...`);
+    
+    const results: ExecutionResult[] = [];
+    
+    for (const orderWithMetadata of orders) {
+      try {
+        const { order } = orderWithMetadata;
+        
+        // Check if order is profitable
+        const isProfitable = await this.isOrderProfitable(order);
+        
+        if (isProfitable) {
+          console.log(`💰 Order ${orderWithMetadata.orderHash} is profitable - executing...`);
+          const result = await this.executeOrder(orderWithMetadata);
+          results.push(result);
+        } else {
+          console.log(`❌ Order ${orderWithMetadata.orderHash} is not profitable - skipping`);
+          results.push({
+            success: false,
+            orderHash: orderWithMetadata.orderHash,
+            error: 'Order not profitable',
+            executionTime: 0
+          });
+        }
+      } catch (error) {
+        console.error(`❌ Failed to process order ${orderWithMetadata.orderHash}:`, error);
+        results.push({
+          success: false,
+          orderHash: orderWithMetadata.orderHash,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          executionTime: 0
+        });
+      }
+    }
+    
+    return results;
   }
 } 

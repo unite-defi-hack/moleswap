@@ -17,6 +17,7 @@ export class ResolverService {
   private state: ResolverState;
   private isRunning: boolean = false;
   private config: ResolverConfig;
+  private failedOrders: Map<string, { attempts: number; lastAttempt: number }> = new Map();
 
   constructor(
     relayerService: RelayerService,
@@ -98,7 +99,11 @@ export class ResolverService {
 
     while (this.isRunning) {
       try {
-        const orders = await this.relayerService.getActiveOrders(maxOrdersPerPoll, 0);
+        // Get order statistics
+        const stats = await this.getOrderStats();
+        console.log(`📊 Pulling new orders... (completed: ${stats.completed}, active: ${stats.active})`);
+        
+        const orders = await this.relayerService.getProcessableOrders(maxOrdersPerPoll, 0);
         
         if (orders.length > 0) {
           console.log(`Found ${orders.length} active orders`);
@@ -118,6 +123,82 @@ export class ResolverService {
   }
 
   /**
+   * Validate if an order should be processed
+   */
+  private validateOrderForProcessing(order: OrderWithMetadata): boolean {
+    // Skip completed or cancelled orders
+    if (order.status === 'completed' || order.status === 'cancelled') {
+      console.log(`Skipping order ${order.orderHash} - status: ${order.status}`);
+      return false;
+    }
+    
+    // Only process active or pending orders
+    if (order.status !== 'active' && order.status !== 'pending') {
+      console.log(`Skipping order ${order.orderHash} - invalid status: ${order.status}`);
+      return false;
+    }
+    
+    // Check if order has required data
+    if (!order.extension || !order.signature) {
+      console.log(`Skipping order ${order.orderHash} - missing extension or signature`);
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Check if an order should be retried after a failure
+   */
+  private shouldRetryOrder(orderHash: string): boolean {
+    const failedOrder = this.failedOrders.get(orderHash);
+    if (!failedOrder) {
+      return true; // First attempt
+    }
+    
+    const maxAttempts = 3;
+    const retryDelayMs = 10000; // 10 seconds
+    const now = Date.now();
+    
+    if (failedOrder.attempts >= maxAttempts) {
+      console.log(`Order ${orderHash} has exceeded max retry attempts (${maxAttempts}), skipping`);
+      return false;
+    }
+    
+    if (now - failedOrder.lastAttempt < retryDelayMs) {
+      console.log(`Order ${orderHash} was recently attempted, waiting before retry...`);
+      return false;
+    }
+    
+    return true;
+  }
+
+  /**
+   * Record a failed order attempt
+   */
+  private recordFailedOrder(orderHash: string): void {
+    const failedOrder = this.failedOrders.get(orderHash);
+    const now = Date.now();
+    
+    if (failedOrder) {
+      failedOrder.attempts++;
+      failedOrder.lastAttempt = now;
+    } else {
+      this.failedOrders.set(orderHash, { attempts: 1, lastAttempt: now });
+    }
+    
+    console.log(`📝 Recorded failed attempt for order ${orderHash} (attempt ${this.failedOrders.get(orderHash)?.attempts})`);
+  }
+
+  /**
+   * Clear failed order record on success
+   */
+  private clearFailedOrder(orderHash: string): void {
+    this.failedOrders.delete(orderHash);
+    console.log(`✅ Cleared failed order record for ${orderHash} (successful execution)`);
+  }
+
+  /**
    * Process a batch of orders
    */
   private async processOrders(orders: OrderWithMetadata[]): Promise<void> {
@@ -131,6 +212,12 @@ export class ResolverService {
         return;
       }
       
+      // Validate order before processing
+      if (!this.validateOrderForProcessing(order)) {
+        console.log('✅ Skipped invalid order, stopping resolver...');
+        process.exit(0);
+      }
+      
       try {
         this.state.totalOrdersProcessed++;
         
@@ -146,9 +233,11 @@ export class ResolverService {
             this.state.successfulExecutions++;
             this.state.totalProfit += result.profit || 0;
             console.log(`Successfully executed order ${order.orderHash}. Profit: ${result.profit}`);
+            this.clearFailedOrder(order.orderHash); // Clear failed record on success
           } else {
             this.state.failedExecutions++;
             console.error(`Failed to execute order ${order.orderHash}: ${result.error}`);
+            this.recordFailedOrder(order.orderHash); // Record failed attempt
           }
         } else {
           console.log(`Order ${order.orderHash} is not profitable, skipping`);
@@ -156,6 +245,7 @@ export class ResolverService {
       } catch (error) {
         console.error(`Error processing order ${order.orderHash}:`, error);
         this.state.failedExecutions++;
+        this.recordFailedOrder(order.orderHash); // Record failed attempt
       }
       
       console.log('✅ Processed one order, stopping resolver...');
@@ -166,6 +256,16 @@ export class ResolverService {
     for (const order of orders) {
       if (!this.isRunning) break;
 
+      // Validate order before processing
+      if (!this.validateOrderForProcessing(order)) {
+        continue; // Skip to next order
+      }
+
+      // Check if order should be retried
+      if (!this.shouldRetryOrder(order.orderHash)) {
+        continue; // Skip to next order
+      }
+
       try {
         this.state.totalOrdersProcessed++;
         
@@ -181,9 +281,11 @@ export class ResolverService {
             this.state.successfulExecutions++;
             this.state.totalProfit += result.profit || 0;
             console.log(`Successfully executed order ${order.orderHash}. Profit: ${result.profit}`);
+            this.clearFailedOrder(order.orderHash); // Clear failed record on success
           } else {
             this.state.failedExecutions++;
             console.error(`Failed to execute order ${order.orderHash}: ${result.error}`);
+            this.recordFailedOrder(order.orderHash); // Record failed attempt
           }
         } else {
           console.log(`Order ${order.orderHash} is not profitable, skipping`);
@@ -191,6 +293,7 @@ export class ResolverService {
       } catch (error) {
         console.error(`Error processing order ${order.orderHash}:`, error);
         this.state.failedExecutions++;
+        this.recordFailedOrder(order.orderHash); // Record failed attempt
       }
     }
   }
@@ -265,10 +368,38 @@ export class ResolverService {
   }
 
   /**
-   * Get all active orders
+   * Get all processable orders (active and pending)
    */
-  async getAllActiveOrders(): Promise<OrderWithMetadata[]> {
-    return this.relayerService.getActiveOrders();
+  async getAllProcessableOrders(): Promise<OrderWithMetadata[]> {
+    return this.relayerService.getProcessableOrders();
+  }
+
+  /**
+   * Get order statistics from relayer
+   */
+  private async getOrderStats(): Promise<{ completed: number; active: number }> {
+    try {
+      // Get all orders to count by status
+      const allOrders = await this.relayerService.getOrders(100, 0); // Get up to 100 orders
+      
+      const stats = {
+        completed: 0,
+        active: 0
+      };
+      
+      allOrders.forEach(order => {
+        if (order.status === 'completed') {
+          stats.completed++;
+        } else if (order.status === 'active') {
+          stats.active++;
+        }
+      });
+      
+      return stats;
+    } catch (error) {
+      console.error('Error getting order stats:', error);
+      return { completed: 0, active: 0 };
+    }
   }
 
   /**
