@@ -68,7 +68,7 @@ async function createOrder(config: MoleswapConfig): Promise<{
   const tonOrderFusion = TonCrossChainOrder.new(
     // new EvmAddress(new Address(config.escrowFactoryAddress)),
     {
-      makerAsset: TonAddress.NATIVE,
+      makerAsset: TonAddress.NATIVE, // or for jetton new TonAddress("kQAOky9rkp7RQN9bAISkKnxElk0wt5xqLZNPy45NfklNKnUI"),
       takerAsset: new EvmAddress(new AddressLike(config.tokenA)),
       makingAmount: MAKING_AMOUNT,
       takingAmount: TAKING_AMOUNT,
@@ -104,7 +104,55 @@ async function createOrder(config: MoleswapConfig): Promise<{
 async function main() {
   try {
     const config = initMoleswapConfig();
-    const { order, secret } = await createOrder(config);
+    // const { order, secret } = await createOrder(config);
+
+    // console.log("order !!!!!!!!", order.toJSON());
+    // process.exit(0);
+
+    const orderOriginal = {
+      "order": {
+          "orderInfo": {
+              "srcToken": "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c",
+              "dstToken": "0xa360725f46f43ad1b1aae09acfae96c2b59d1013",
+              "maker": "EQCDScvyElUG1_R9Zm60degE6gUfWBXr-dwmdJasz4D7Y-BU",
+              "srcAmount": "1000000000",
+              "minDstAmount": "1000000000",
+              "receiver": "0x71078879cd9a1d7987b74cee6b6c0d130f1a0115"
+          },
+          "escrowParams": {
+              "hashLock": "0xd8e5c652af9b83515aa5f5b59152d7436a5532ea6609110ecff93c24cb92a9e9",
+              "srcChainId": 608,
+              "dstChainId": 11155111,
+              "srcSafetyDeposit": "1000000000000",
+              "dstSafetyDeposit": "1000000000000",
+              "timeLocks": "5021681389186245593467173291389819933186039662988153480806400"
+          },
+          "details": {
+              "auction": {
+                  "startTime": "1754215276",
+                  "duration": "120",
+                  "initialRateBump": 0,
+                  "points": []
+              }
+          },
+          "extra": {
+              "srcAssetIsNative": true,
+              "orderExpirationDelay": "3600",
+              "source": "sdk",
+              "allowMultipleFills": false,
+              "allowPartialFills": false,
+              "salt": "2620121409"
+          }
+      },
+      "extension": "949dc439ed01c8000887bb2140ae9835a67eb8b7ac9742cedceedf0515ca1d3d",
+      "secret": "0xe88535269804e9a4f7a940d29d3121bee346f63ac97236a50ebefc9978559206",
+      "hashlock": "0xd8e5c652af9b83515aa5f5b59152d7436a5532ea6609110ecff93c24cb92a9e9",
+      "orderHash": "ae223545eab858c7db2205cb8cba01cff04c1f140a5c1fb2a0aff134ac44ff9e",
+      "expirationTime": "2025-08-03T11:03:16.000Z"
+  }
+
+    const order = TonCrossChainOrder.fromJSON(orderOriginal.order);
+    const secret = orderOriginal.secret;
 
     const moleSwapOrder = await TonAdapter.createTonToEvmOrderConfig(
       order

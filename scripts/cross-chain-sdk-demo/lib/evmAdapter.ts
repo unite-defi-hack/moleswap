@@ -19,6 +19,7 @@ import {
   HashLock,
   TimeLocks,
   DstImmutablesComplement,
+  TonAddress,
 } from "@1inch/cross-chain-sdk";
 import { Signature } from "ethers";
 import { MoleswapConfig } from "./config";
@@ -548,17 +549,19 @@ export class EvmAdapter {
   /**
    * Create a mock EVM address for TON tokens that can't be converted to EVM addresses
    */
-  private createMockEvmAddressForTonToken(tokenBigInt: bigint): EvmAddress {
+  public createMockEvmAddressForTonToken(tokenBigInt: bigint): EvmAddress {
     // If it's the problematic 0x0101... TON token, return a mock EVM address
-    const tokenHex = tokenBigInt.toString(16).padStart(64, "0");
-    if (tokenHex.startsWith("01010101")) {
-      // Return a mock address that represents TON native token
+    // if parsable ton address return mock token
+    try {
+      TonAddress.fromBigInt(tokenBigInt);
       return new EvmAddress(
         new Address("0x0000000000000000000000000000000000000000")
       );
+    } catch (error) {
+      return new EvmAddress(Address.fromBigInt(tokenBigInt));
     }
-    // Otherwise try to convert normally
-    return new EvmAddress(Address.fromBigInt(tokenBigInt));
+
+
   }
 
   /**
@@ -789,7 +792,7 @@ export class EvmAdapter {
     const token = BigInt(orderConfig.taker_asset!.toString());
     const amount = orderConfig.taking_amount!;
     const timeLocks = orderConfig.timeLocks;
-    const safetyDeposit = orderConfig.dstSafetyDeposit;
+    const safetyDeposit = orderConfig.dstSafetyDeposit!;
 
     return this.createDestinationEscrow(
       wallet,
@@ -819,7 +822,7 @@ export class EvmAdapter {
     const token = BigInt(orderConfig.taker_asset!.toString());
     const amount = orderConfig.taking_amount!;
     const timeLocks = orderConfig.timeLocks;
-    const safetyDeposit = orderConfig.dstSafetyDeposit;
+    const safetyDeposit = orderConfig.dstSafetyDeposit!;
 
     return this.withdrawFromDstEscrow(
       escrowAddress,
