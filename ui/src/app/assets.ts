@@ -26,7 +26,7 @@ export const AVAILABLE_ASSETS: Asset[] = [
         coinGeckoId: 'ethereum',
         network: 11155111, // Sepolia (Ethereum testnet)
         networkName: 'Ethereum',
-        tokenAddress: '0xda0000d4000015a526378bb6fafc650cea5966f8',
+        tokenAddress: '0xa360725F46f43aD1B1aae09AcFae96c2b59D1013',
         icon: '/assets/ethereum.svg',
         decimals: BigInt(10**18),
     },
