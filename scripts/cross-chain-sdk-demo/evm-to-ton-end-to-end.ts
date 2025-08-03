@@ -76,7 +76,7 @@ async function createOrder(config: MoleswapConfig, maker: Wallet) {
     new EvmAddress(new Address(config.escrowFactoryAddress)),
     {
       makerAsset: new EvmAddress(new Address(config.tokenA)),
-      takerAsset: TonAddress.NATIVE,
+      takerAsset: TonAddress.NATIVE, // or jetton with new TonAddress("kQAOky9rkp7RQN9bAISkKnxElk0wt5xqLZNPy45NfklNKnUI")
       makingAmount: MAKING_AMOUNT,
       takingAmount: TAKING_AMOUNT,
       maker: new EvmAddress(new Address(maker.address)),
@@ -201,7 +201,8 @@ async function createTonDestinationEscrow(
 
   const tonOrder = TonAdapter.createEvmToTonOrderConfig(
     evmOrderData,
-    decodedOrder.receiver.toString()
+    decodedOrder.receiver.toString(),
+    decodedOrder.takerAsset.toString()
   );
 
   const destinationResult = await TonAdapter.createDestinationEscrow(
@@ -256,7 +257,7 @@ async function main() {
   console.log(
     'Waiting for one block - before "resolver" starts to execute order'
   );
-  await new Promise((resolve) => setTimeout(resolve, 10000));
+  await new Promise((resolve) => setTimeout(resolve, 15000));
   // resolver deposits to src escrow
   const depositResult = await depositToSrcEscrow(orderData, config);
   console.log("Deposit to source escrow completed", depositResult);

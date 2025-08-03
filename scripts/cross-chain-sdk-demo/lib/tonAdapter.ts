@@ -9,6 +9,8 @@ import {
   LopOp,
   DstEscrow,
   SrcEscrow,
+  JettonWallet,
+  JettonMinter
 } from "moleswap-ton";
 
 import { initMoleswapConfig } from "./config";
@@ -57,20 +59,41 @@ export class TonAdapter {
 
 
   static async sendCreateOrder(
-    orderData: OrderConfig,
+    order: OrderConfig,
   ) {
-
     const config = initMoleswapConfig();
     const { client, walletContract, key } = await TonAdapter.setupTonWallet(config.tonMakerMnemonic);
 
     const contract = LimitOrderProtocol.createFromAddress(Address.parse(config.tonLopAddress));
-    const lopContract = client.open(contract);
+    const lopSC = client.open(contract);
     const seqno = await walletContract.getSeqno();
 
-    await lopContract.sendCreateOrder(
-      walletContract.sender(key.secretKey),
-      orderData
-    );
+    if (order.maker_asset.toString() === HOLE_ADDRESS.toString()) {
+      await lopSC.sendCreateOrder(walletContract.sender(key.secretKey), order);
+  } else {
+      const lopJetton = client.open(JettonWallet.createFromAddress(order.maker_asset as Address));
+      const { jettonMasterAddress } = await lopJetton.getWalletData();
+      const jettonMinter = client.open(JettonMinter.createFromAddress(jettonMasterAddress));
+      const jettonWalletAddr = await jettonMinter.getWalletAddress(walletContract.address);
+      const jettonWallet = client.open(JettonWallet.createFromAddress(jettonWalletAddr));
+
+      const orderHash = LimitOrderProtocol.calculateSrcOrderHash(order);
+      const srcEscrowAddress = await lopSC.getSrcEscrowAddress(orderHash);
+      order.asset_jetton_address = await jettonMinter.getWalletAddress(srcEscrowAddress);
+      const sender = walletContract.sender(key.secretKey);
+      
+      const senderWithAddress = {
+        ...sender,
+        address: walletContract.address,
+        send: sender.send
+      };
+      
+      await jettonWallet.sendCreateOrder(
+        senderWithAddress,
+        order,
+        lopSC.address
+      );
+  }
 
     const result = await TonAdapter.waitForTransaction(walletContract, seqno);
     return result;
@@ -247,79 +270,71 @@ export class TonAdapter {
   }
   static async createDestinationEscrow(
     lopAddress: string,
-    tonOrder: OrderConfig
-  ): Promise<TonDestinationResult> {
-    try {
-      const config = initMoleswapConfig();
-      const { walletContract, key } = await TonAdapter.setupTonWallet(config.tonMakerMnemonic);
+    order: OrderConfig
+  ): Promise<TransactionResult> {
 
-      const lopContract = LimitOrderProtocol.createFromAddress(
+      const config = initMoleswapConfig();
+      const { walletContract, key, client } = await TonAdapter.setupTonWallet(config.tonMakerMnemonic);
+
+      const contract = LimitOrderProtocol.createFromAddress(
         Address.parse(lopAddress)
       );
-
-      const body = beginCell()
-        .storeUint(LopOp.fill_order, 32)
-        .storeUint(0, 64) // queryId
-        .storeUint(tonOrder.maker_address as bigint, 256)
-        .storeUint(tonOrder.maker_asset as bigint, 256)
-        .storeUint(tonOrder.making_amount, 128)
-        .storeAddress(tonOrder.receiver_address as Address)
-        .storeRef(
-          beginCell()
-            .storeAddress(tonOrder.taker_address as Address)
-            .storeAddress(tonOrder.taker_asset as Address)
-            .storeCoins(tonOrder.taking_amount)
-            .endCell()
-        )
-        .storeRef(
-          beginCell()
-            .storeUint(tonOrder.order_hash!!, 256)
-            .storeUint(tonOrder.hashlock, 256)
-            .storeUint(tonOrder.creation_time, 32)
-            .storeUint(tonOrder.expiration_time, 32)
-            .endCell()
-        )
-        .endCell();
+      const lopSC = client.open(contract);
 
       const seqno = await walletContract.getSeqno();
-      const message = internal({
-        to: lopContract.address,
-        value: toNano("0.05") + tonOrder.taking_amount,
-        body,
-        bounce: true,
-      });
 
-      await walletContract.sendTransfer({
-        seqno,
-        secretKey: key.secretKey,
-        messages: [message],
-      });
+      if (order.taker_asset.toString() === HOLE_ADDRESS.toString()) {
+        await lopSC.sendFillOrder(walletContract.sender(key.secretKey), order);
+    } else {
+        const lopJetton = client.open(JettonWallet.createFromAddress(order.taker_asset as Address));
+        const { jettonMasterAddress } = await lopJetton.getWalletData();
+        const jettonMinter = client.open(JettonMinter.createFromAddress(jettonMasterAddress));
 
-      return {
-        transactionHash: seqno.toString(),
-        blockTime: Math.floor(Date.now() / 1000),
-        orderHash: tonOrder.order_hash!,
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to create destination escrow: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+        const jettonWalletAddr = await jettonMinter.getWalletAddress(walletContract.address);
+        const jettonWallet = client.open(JettonWallet.createFromAddress(jettonWalletAddr));
+
+        const orderHash = LimitOrderProtocol.calculateDstOrderHash(order);
+        const dstEscrowAddress = await lopSC.getDstEscrowAddress(orderHash);
+        order.asset_jetton_address = await jettonMinter.getWalletAddress(dstEscrowAddress);
+
+      const sender = walletContract.sender(key.secretKey);
+        const senderWithAddress = {
+          ...sender,
+          address: walletContract.address,
+          send: sender.send
+        };
+
+        await jettonWallet.sendFillOrder(senderWithAddress, order, lopSC.address);
     }
+
+      const result = await TonAdapter.waitForTransaction(walletContract, seqno);
+
+
+      return result;
   }
 
   static createEvmToTonOrderConfig(
     evmOrderData: any,
-    receiverAddress: string
+    receiverAddress: string,
+    realDestinationToken: string
   ): OrderConfig {
+
+    let takerAssetToUse;
+
+      try {
+        const tonAddress = Address.parse(realDestinationToken);
+        takerAssetToUse = tonAddress;
+      } catch (error) {
+        takerAssetToUse = ethAddressToBigInt(evmOrderData.order.makerAsset);
+      }
+
     return {
       maker_address: ethAddressToBigInt(evmOrderData.order.maker),
       maker_asset: ethAddressToBigInt(evmOrderData.order.makerAsset),
       making_amount: BigInt(evmOrderData.order.makingAmount),
       receiver_address: Address.parse(receiverAddress),
       taker_address: evmOrderData.order.taker,
-      taker_asset: HOLE_ADDRESS,
+      taker_asset: takerAssetToUse,
       taking_amount: BigInt(evmOrderData.order.takingAmount),
       order_hash: BigInt(evmOrderData.orderHash),
       creation_time: Math.floor(Date.now() / 1000),
@@ -331,6 +346,7 @@ export class TonAdapter {
       timeLocks: evmOrderData.timeLocks,
       srcSafetyDeposit: evmOrderData.srcSafetyDeposit ? BigInt(evmOrderData.srcSafetyDeposit) : 0n,
       dstSafetyDeposit: evmOrderData.dstSafetyDeposit ? BigInt(evmOrderData.dstSafetyDeposit) : 0n,
+      asset_jetton_address: HOLE_ADDRESS,
     };
   }
 
@@ -352,6 +368,7 @@ export class TonAdapter {
       timeLocks: order.timeLocks,
       srcSafetyDeposit: order.srcSafetyDeposit,
       dstSafetyDeposit: order.dstSafetyDeposit,
+      asset_jetton_address: HOLE_ADDRESS,
     }
 
     const orderHash = LimitOrderProtocol.calculateSrcOrderHash(orderConfig);
